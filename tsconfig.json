@@ -7,5 +7,10 @@
     "target": "es2017",
     "noImplicitAny": false,
     "module": "commonjs",
+    "lib": [
+      "esnext",
+      "es6",
+      "esnext.asynciterable"
+    ]
   },
 }

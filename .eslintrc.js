@@ -12,7 +12,8 @@ module.exports = {
       "typescript/no-unused-vars": 2,
       "arrow-body-style": 0,
       "no-console": 0,
-      "no-await-in-loop": 0
+      "no-await-in-loop": 0,
+      'no-plusplus': 0,
   },
   "plugins": [
       "typescript",
