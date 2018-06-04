@@ -1,0 +1,40 @@
+{
+  "name": "dbacked-agent",
+  "version": "0.0.1",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:ts": "tsc",
+    "build:bin": "ts-node misc/scripts/build.ts",
+    "watch": "nodemon -e ts,tsx --exec 'ts-node' src/index.ts",
+    "start:nobuild": "ts-node src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dbacked/agent.git"
+  },
+  "author": "Guillaume Besson",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/dbacked/agent/issues"
+  },
+  "homepage": "https://github.com/dbacked/agent#readme",
+  "dependencies": {
+    "axios": "^0.18.0",
+    "commander": "^2.15.1"
+  },
+  "devDependencies": {
+    "@types/node": "^10.1.4",
+    "nexe": "^2.0.0-rc.28",
+    "nodemon": "^1.17.5",
+    "ts-node": "^6.0.5",
+    "typescript": "^2.8.4",
+    "typescript-eslint-parser": "^15.0.0",
+    "eslint": "^4.19.1",
+    "eslint-config-airbnb-base": "^12.1.0",
+    "eslint-plugin-import": "^2.9.0",
+    "eslint-plugin-jest": "^21.15.0",
+    "eslint-plugin-typescript": "^0.12.0"
+  }
+}
