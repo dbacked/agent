@@ -22,12 +22,11 @@
   "homepage": "https://github.com/dbacked/agent#readme",
   "dependencies": {
     "axios": "^0.18.0",
-    "block-stream2": "^1.1.0",
     "commander": "^2.15.1",
-    "evaporate": "^2.1.4",
-    "fixed-size-stream-splitter": "^1.1.0",
     "mkdirp": "^0.5.1",
+    "multistream": "^2.1.1",
     "promise-readable": "^3.1.5",
+    "randomstring": "^1.1.5",
     "winston": "^3.0.0-rc3"
   },
   "devDependencies": {

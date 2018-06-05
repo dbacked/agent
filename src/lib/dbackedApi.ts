@@ -28,9 +28,11 @@ export const getProject = async () => {
   }
 };
 
-export const createBackup = async ({ agentId }) => {
+export const createBackup = async ({ agentId, agentVersion, publicKey }) => {
   const { data } = await api.post('projects/own/backups', {
     agentId,
+    agentVersion,
+    publicKey,
   });
   return data;
 };
@@ -43,14 +45,19 @@ export const getUploadPartUrl = async (backup, partNumber) => {
   return data;
 };
 
-export const finishUpload = async (backup, partsEtag) => {
-  try {
-    const { data } = await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
-      status: 'DONE',
-      partsEtag,
-    });
-    return data;
-  } catch (e) {
-    console.error(e);
-  }
+export const finishUpload = async (backup, partsEtag, hash) => {
+  const { data } = await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
+    status: 'DONE',
+    partsEtag,
+    hash,
+  });
+  return data;
+};
+
+export const reportError = async (backup, error) => {
+  const { data } = await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
+    status: 'ERROR',
+    error,
+  });
+  return data;
 };

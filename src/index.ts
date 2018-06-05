@@ -1,19 +1,23 @@
 import * as program from 'commander';
 import { resolve } from 'path';
+import { createHash } from 'crypto';
+import * as MultiStream from 'multistream';
 
 import assertExit from './lib/assertExit';
-import { getProject, registerApiKey, createBackup, getUploadPartUrl, finishUpload } from './lib/dbackedApi';
+import { getProject, registerApiKey, createBackup, getUploadPartUrl, finishUpload, reportError } from './lib/dbackedApi';
 import { delay } from './lib/delay';
 import { getOrGenerateAgentId } from './lib/agentId';
 import logger from './lib/log';
 import { checkDbDumpProgram } from './lib/dbDumpProgram';
 import { DB_TYPE, Config } from './lib/config';
 import { startBackup, createBackupKey } from './lib/dbBackup';
-import { PassThrough } from 'stream';
-import Axios from 'axios';
 import { uploadToS3 } from './lib/s3';
+import { createReadStream } from './lib/streamHelpers';
+import { PassThrough } from 'stream';
 
-program.version('0.0.1')
+const VERSION = '0.0.1';
+
+program.version(VERSION)
   .option('--apikey <apikey>', 'DBacked API key (can also be provided with the DBACKED_APIKEY env variable)')
   .option('--public-key <publicKey>', 'Public key linked to the project (env variable: DBACKED_PUBLIC_KEY)')
   .option('--db-type <dbType>', 'Database type (pg or mysql) (env variable: DBACKED_DB_TYPE)')
@@ -39,7 +43,6 @@ const config: Config = {
 };
 
 assertExit(config.apikey, '--apikey is required');
-assertExit(config.publicKey, '--public-key is required');
 assertExit(config.dbType, '--db-type is required');
 assertExit(DB_TYPE[config.dbType], '--db-type should be pg or mysql');
 assertExit(config.dbHost, '--db-host is required');
@@ -47,46 +50,72 @@ assertExit(config.dbUsername, '--db-username is required');
 assertExit(config.dbPassword, '--db-password is required');
 assertExit(config.dbName, '--db-name is required');
 
+if (!config.publicKey) {
+  logger.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY, this could expose you to a man in the middle attack on your backups');
+}
+
 async function main() {
   const agentId = await getOrGenerateAgentId({ directory: config.configDirectory });
+  logger.info('Agent id:', { agentId });
   registerApiKey(config.apikey);
+  let backup;
   while (true) {
     const project = await getProject();
+    if (!config.publicKey) {
+      config.publicKey = project.publicKey;
+    }
     try {
-      const { backup, uploadId, firstPartUploadUrl } = await createBackup({ agentId });
+      const backupInfo = await createBackup({
+        agentId,
+        agentVersion: VERSION,
+        publicKey: config.publicKey,
+      });
+      backup = backupInfo.backup;
       await checkDbDumpProgram(config.dbType, config.configDirectory);
-      // const {stopJobReporting} =
-      const backupFileStream = new PassThrough();
+      const hash = createHash('md5');
+
       const { key: backupKey, encryptedKey } = await createBackupKey(config.publicKey);
-      backupFileStream.write(encryptedKey);
-      const backupStream = await startBackup(backupKey, config);
-      backupStream.pipe(backupFileStream);
+      // TODO: test if dump is working
+      const { backupStream, iv } = await startBackup(backupKey, config);
+
+      const encryptedKeyStream = createReadStream(encryptedKey);
+      const ivStream = createReadStream(iv);
+      const backupFileStream = MultiStream([
+        encryptedKeyStream,
+        ivStream,
+        backupStream,
+      ]);
+      // Need a passthrough because else the stream is just consumed by the hash
+      const uploadingStream = new PassThrough();
+
+      backupFileStream.pipe(hash);
+      backupFileStream.pipe(uploadingStream);
+
+      // TODO: send hash to S3 while uploading
       const partsEtag = await uploadToS3({
-        fileStream: backupFileStream,
+        fileStream: uploadingStream,
         generateBackupUrl: async ({ partNumber }) => {
           logger.debug('Getting multipart upload URL for part number', { partNumber });
           if (partNumber === 1) {
-            return firstPartUploadUrl;
+            return backupInfo.firstPartUploadUrl;
           }
           return getUploadPartUrl(backup, partNumber);
         },
       });
-      finishUpload(backup, partsEtag);
-      // const data = await Axios({
-      //   method: 'put',
-      //   url: newBackup.uploadUrl,
-      //   data: backupFileStream,
-      //   headers: {
-      //     'content-type': 'application/octet-stream',
-      //   },
-      // });
-      // console.log(data);
+      logger.info('Informing server the upload is finished');
+      hash.end();
+      await finishUpload(backup, partsEtag, hash.digest('base64'));
+      logger.info('backup finished !');
+      backup = undefined;
     } catch (e) {
       if (e.response && e.response.data && e.response.data.status === 409) {
         logger.info('No backup needed, waiting 5 minutes');
       } else {
         console.log(e);
-        logger.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || e.response || e });
+        if (backup) {
+          await reportError(backup, e);
+        }
+        logger.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e });
       }
     }
     await delay(5 * 60 * 1000);
