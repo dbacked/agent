@@ -75,7 +75,6 @@ async function main() {
       const hash = createHash('md5');
 
       const { key: backupKey, encryptedKey } = await createBackupKey(config.publicKey);
-      // TODO: test if dump is working
       const { backupStream, iv } = await startBackup(backupKey, config);
 
       const encryptedKeyStream = createReadStream(encryptedKey);
@@ -91,31 +90,31 @@ async function main() {
       backupFileStream.pipe(hash);
       backupFileStream.pipe(uploadingStream);
 
-      // TODO: send hash to S3 while uploading
       const partsEtag = await uploadToS3({
         fileStream: uploadingStream,
-        generateBackupUrl: async ({ partNumber }) => {
+        generateBackupUrl: async ({ partNumber, partHash }) => {
           logger.debug('Getting multipart upload URL for part number', { partNumber });
-          if (partNumber === 1) {
-            return backupInfo.firstPartUploadUrl;
-          }
-          return getUploadPartUrl(backup, partNumber);
+          const { partUploadUrl } = await getUploadPartUrl({
+            backup, partNumber, agentId, hash: partHash,
+          });
+          return partUploadUrl;
         },
       });
       logger.info('Informing server the upload is finished');
       hash.end();
-      await finishUpload(backup, partsEtag, hash.digest('base64'));
+      await finishUpload({
+        backup, partsEtag, hash: hash.digest('base64'), agentId,
+      });
       logger.info('backup finished !');
       backup = undefined;
     } catch (e) {
-      if (e.response && e.response.data && e.response.data.status === 409) {
+      if (e.response && e.response.data && e.response.data.message === 'No backup needed for the moment') {
         logger.info('No backup needed, waiting 5 minutes');
       } else {
-        console.log(e);
         if (backup) {
-          await reportError(backup, e);
+          await reportError({ backup, error: e.code || (e.response && e.response.data) || e.message, agentId });
         }
-        logger.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e });
+        logger.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e.message });
       }
     }
     await delay(5 * 60 * 1000);

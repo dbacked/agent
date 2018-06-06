@@ -2,6 +2,7 @@ import Axios from 'axios';
 import { PromiseReadable } from 'promise-readable';
 
 import logger from './log';
+import { createHash } from 'crypto';
 // import { Stream, Readable } from 'stream';
 // import { delay } from './delay';
 
@@ -18,22 +19,22 @@ export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
     if (!chunk) {
       break;
     }
+    const hash = createHash('md5').update(chunk).digest('base64');
     logger.debug('Starting uploading chunk', { partNumber, size: chunk.length });
-    try {
-      const url = await generateBackupUrl({ partNumber });
-      const res = await Axios({
-        method: 'PUT',
-        url,
-        data: chunk,
-        transformRequest: [(data, headers) => {
-          delete headers.put['Content-Type'];
-          return data;
-        }],
-      });
-      partsEtag.push(res.headers.etag);
-    } catch (e) {
-      console.error(e);
-    }
+    const url = await generateBackupUrl({ partNumber, partHash: hash });
+    const res = await Axios({
+      method: 'PUT',
+      url,
+      data: chunk,
+      headers: {
+        'Content-MD5': hash,
+      },
+      transformRequest: [(data, headers) => {
+        delete headers.put['Content-Type'];
+        return data;
+      }],
+    });
+    partsEtag.push(res.headers.etag);
     logger.debug('Uploaded chunk', { partNumber });
     partNumber++;
   }

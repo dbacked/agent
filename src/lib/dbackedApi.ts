@@ -37,27 +37,40 @@ export const createBackup = async ({ agentId, agentVersion, publicKey }) => {
   return data;
 };
 
-export const getUploadPartUrl = async (backup, partNumber) => {
+export const getUploadPartUrl = async ({
+  backup, partNumber, hash, agentId,
+}) => {
   const { data } = await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
     partNumber,
+    agentId,
+    hash,
     status: 'IN_PROGRESS',
   });
   return data;
 };
 
-export const finishUpload = async (backup, partsEtag, hash) => {
+export const finishUpload = async ({
+  backup, partsEtag, hash, agentId,
+}) => {
   const { data } = await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
     status: 'DONE',
     partsEtag,
     hash,
+    agentId,
   });
   return data;
 };
 
-export const reportError = async (backup, error) => {
-  const { data } = await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
-    status: 'ERROR',
-    error,
-  });
-  return data;
+export const reportError = async ({ backup, error, agentId }) => {
+  try {
+    logger.info('Sending error to DBacked API for alerting');
+    await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
+      status: 'ERROR',
+      error,
+      agentId,
+    });
+  } catch (e) {
+    console.error(e, e.response && e.response.data);
+    logger.warn('Couldn\'t send error message to dbacked server', { error: e.message });
+  }
 };
