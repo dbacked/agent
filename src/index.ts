@@ -19,10 +19,10 @@ import { startBackup, createBackupKey } from './lib/dbBackup';
 import { uploadToS3 } from './lib/s3';
 import { createReadStream } from './lib/streamHelpers';
 
-const VERSION = '0.0.1';
+const VERSION = [0, 0, 1];
 const mkdirPromise = promisify(mkdir);
 
-program.version(VERSION)
+program.version(VERSION.join('.'))
   .option('--apikey <apikey>', '[REQUIRED] DBacked API key (can also be provided with the DBACKED_APIKEY env variable)')
   .option('--db-type <dbType>', '[REQUIRED] Database type (pg or mysql) (env variable: DBACKED_DB_TYPE)')
   .option('--db-host <dbHost>', '[REQUIRED] Database host (env variable: DBACKED_DB_HOST)')
@@ -87,7 +87,7 @@ async function main() {
     try {
       const backupInfo = await createBackup({
         agentId,
-        agentVersion: VERSION,
+        agentVersion: VERSION.join('.'),
         publicKey: config.publicKey,
         dbType: config.dbType,
       });
@@ -99,11 +99,15 @@ async function main() {
       const { key: backupKey, encryptedKey } = await createBackupKey(config.publicKey);
       const { backupStream, iv } = await startBackup(backupKey, config);
 
-      console.log(Buffer.from(<ArrayBuffer>(new Uint32Array([encryptedKey.length])).buffer));
+      const magicStream = createReadStream(Buffer.from('DBACKED'));
+      // need to align to 4 so prepending 0 to version buffer
+      const versionStream = createReadStream(Buffer.from([...VERSION]));
       const encryptedKeyLengthStream = createReadStream(Buffer.from(<ArrayBuffer>(new Uint32Array([encryptedKey.length])).buffer));
       const encryptedKeyStream = createReadStream(encryptedKey);
       const ivStream = createReadStream(iv);
       const backupFileStream = MultiStream([
+        magicStream,
+        versionStream,
         encryptedKeyLengthStream,
         encryptedKeyStream,
         ivStream,
