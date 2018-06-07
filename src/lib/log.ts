@@ -7,9 +7,7 @@ const logger = Winston.createLogger({
   transports: [
     new Winston.transports.File({ filename: 'error.log', level: 'error' }),
     new Winston.transports.File({ filename: 'combined.log' }),
-    new Winston.transports.Console({
-      format: Winston.format.simple(),
-    }),
+    new Winston.transports.Console(),
   ],
 });
 

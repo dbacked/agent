@@ -28,11 +28,14 @@ export const getProject = async () => {
   }
 };
 
-export const createBackup = async ({ agentId, agentVersion, publicKey }) => {
+export const createBackup = async ({
+  agentId, agentVersion, publicKey, dbType,
+}) => {
   const { data } = await api.post('projects/own/backups', {
     agentId,
     agentVersion,
     publicKey,
+    dbType,
   });
   return data;
 };

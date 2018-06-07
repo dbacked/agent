@@ -1,8 +1,8 @@
 import Axios from 'axios';
 import { PromiseReadable } from 'promise-readable';
+import { createHash } from 'crypto';
 
 import logger from './log';
-import { createHash } from 'crypto';
 // import { Stream, Readable } from 'stream';
 // import { delay } from './delay';
 
@@ -34,8 +34,8 @@ export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
         return data;
       }],
     });
-    partsEtag.push(res.headers.etag);
     logger.debug('Uploaded chunk', { partNumber });
+    partsEtag.push(res.headers.etag);
     partNumber++;
   }
   return partsEtag;

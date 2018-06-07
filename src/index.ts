@@ -69,8 +69,10 @@ async function main() {
         agentId,
         agentVersion: VERSION,
         publicKey: config.publicKey,
+        dbType: config.dbType,
       });
       backup = backupInfo.backup;
+      // TODO test for mysql
       await checkDbDumpProgram(config.dbType, config.configDirectory);
       const hash = createHash('md5');
 

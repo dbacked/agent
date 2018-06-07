@@ -11,18 +11,29 @@ const randomBytesPromise = promisify(randomBytes);
 
 export const startBackup = async (backupKey, config: Config) => {
   logger.debug('Starting dump');
-  const args = [
-    '-U', config.dbUsername, '-h', config.dbHost,
-    '-Z', '7', '--format=c',
-    config.dbName,
-  ];
+  let args;
+  if (config.dbType === 'pg') {
+    args = [
+      '-U', config.dbUsername, '-h', config.dbHost,
+      '-Z', '7', '--format=c',
+      config.dbName,
+    ];
+  } else if (config.dbType === 'mysql') {
+    args = [
+      '-u', config.dbUsername, '-h', config.dbHost,
+      '-C', '--single-transaction', `--password=${config.dbPassword}`,
+      config.dbName,
+    ];
+  }
   const dumpProcess = await spawn(resolve(config.configDirectory, `${config.dbType}_dump`), args, {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
-  dumpProcess.stdin.write(config.dbPassword);
-  dumpProcess.stdin.write('\n');
-  dumpProcess.stdin.end();
+  if (config.dbType === 'pg') {
+    dumpProcess.stdin.write(config.dbPassword);
+    dumpProcess.stdin.write('\n');
+    dumpProcess.stdin.end();
+  }
 
   await waitForProcessStart(dumpProcess);
 
