@@ -17,5 +17,5 @@ The agent is a long-lived process. You should not put this agent in a CRON as it
 It will authentify and check if a backup should be started every 5 minutes. If a backup is needed, it will lock the job on the API, download `pg_dump` or `mysql_dump` and stream their output to the backup server. The output will be encrypted with an 256bit AES key that is stored encrypted by the RSA public key associated with project at the start of the file.
 
 ```
-[Encrypted AES key length in bytes (4 bytes)][Encrypted AES key (X bytes from header)][AES IV (16 bytes)][DB dump program output]
+[DBACKED magic (7 bytes)][Version (3 bytes)][Encrypted AES key length in bytes (4 bytes)][Encrypted AES key (X bytes from header)][AES IV (16 bytes)][DB dump program output]
 ```
