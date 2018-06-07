@@ -2,6 +2,11 @@ import * as program from 'commander';
 import { resolve } from 'path';
 import { createHash } from 'crypto';
 import * as MultiStream from 'multistream';
+import { PassThrough } from 'stream';
+import * as daemon from 'daemonize-process';
+import * as lockfile from 'proper-lockfile';
+import { mkdir } from 'fs';
+import { promisify } from 'util';
 
 import assertExit from './lib/assertExit';
 import { getProject, registerApiKey, createBackup, getUploadPartUrl, finishUpload, reportError } from './lib/dbackedApi';
@@ -13,19 +18,21 @@ import { DB_TYPE, Config } from './lib/config';
 import { startBackup, createBackupKey } from './lib/dbBackup';
 import { uploadToS3 } from './lib/s3';
 import { createReadStream } from './lib/streamHelpers';
-import { PassThrough } from 'stream';
 
 const VERSION = '0.0.1';
+const mkdirPromise = promisify(mkdir);
 
 program.version(VERSION)
-  .option('--apikey <apikey>', 'DBacked API key (can also be provided with the DBACKED_APIKEY env variable)')
+  .option('--apikey <apikey>', '[REQUIRED] DBacked API key (can also be provided with the DBACKED_APIKEY env variable)')
+  .option('--db-type <dbType>', '[REQUIRED] Database type (pg or mysql) (env variable: DBACKED_DB_TYPE)')
+  .option('--db-host <dbHost>', '[REQUIRED] Database host (env variable: DBACKED_DB_HOST)')
+  .option('--db-username <dbUsername>', '[REQUIRED] Database username (env variable: DBACKED_DB_USERNAME)')
+  .option('--db-password <dbPassword>', '[REQUIRED] Database password (env variable: DBACKED_DB_PASSWORD)')
+  .option('--db-name <dbName>', '[REQUIRED] Database name (env variable: DBACKED_DB_NAME)')
   .option('--public-key <publicKey>', 'Public key linked to the project (env variable: DBACKED_PUBLIC_KEY)')
-  .option('--db-type <dbType>', 'Database type (pg or mysql) (env variable: DBACKED_DB_TYPE)')
-  .option('--db-host <dbHost>', 'Database host (env variable: DBACKED_DB_HOST)')
-  .option('--db-username <dbUsername>', 'Database username (env variable: DBACKED_DB_USERNAME)')
-  .option('--db-password <dbPassword>', 'Database password (env variable: DBACKED_DB_PASSWORD)')
-  .option('--db-name <dbName>', 'Database name (env variable: DBACKED_DB_NAME)')
   .option('--config-directory <directory>', 'Directory where the agent id and others files are stored, default $HOME/.dbacked')
+  .option('--daemon', 'Detach the process as a daemon, will check if another daemon is not already started')
+  .option('--daemon-name <name>', 'Allows multiple daemons to be started at the same time under different names')
   .parse(process.argv);
 
 const config: Config = {
@@ -55,6 +62,19 @@ if (!config.publicKey) {
 }
 
 async function main() {
+  if (program.daemon) {
+    const daemonName = program.daemonName ? `dbacked_${program.daemonName}` : 'dbacked';
+    const lockDir = `/tmp/${daemonName}`;
+    try {
+      await mkdirPromise(lockDir);
+    } catch (e) {}
+    if (await lockfile.check(lockDir)) {
+      logger.error('A daemon is already running, use the --daemon-name params if you need to launch it multiple time');
+      process.exit(1);
+    }
+    daemon();
+    await lockfile.lock(lockDir);
+  }
   const agentId = await getOrGenerateAgentId({ directory: config.configDirectory });
   logger.info('Agent id:', { agentId });
   registerApiKey(config.apikey);
@@ -79,9 +99,12 @@ async function main() {
       const { key: backupKey, encryptedKey } = await createBackupKey(config.publicKey);
       const { backupStream, iv } = await startBackup(backupKey, config);
 
+      console.log(Buffer.from(<ArrayBuffer>(new Uint32Array([encryptedKey.length])).buffer));
+      const encryptedKeyLengthStream = createReadStream(Buffer.from(<ArrayBuffer>(new Uint32Array([encryptedKey.length])).buffer));
       const encryptedKeyStream = createReadStream(encryptedKey);
       const ivStream = createReadStream(iv);
       const backupFileStream = MultiStream([
+        encryptedKeyLengthStream,
         encryptedKeyStream,
         ivStream,
         backupStream,
