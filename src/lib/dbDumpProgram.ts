@@ -1,6 +1,6 @@
 import { resolve } from 'path';
 import Axios from 'axios';
-import { createWriteStream, chmod } from 'fs';
+import { createWriteStream } from 'fs';
 
 import { DB_TYPE } from './config';
 import { fileExists, waitForStreamEnd, chmodExec } from './fs';
