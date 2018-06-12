@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "removeComments": false,
+    "preserveConstEnums": true,
+    "sourceMap": true,
+    "target": "ES6",
+    "noImplicitAny": false,
+    "module": "commonjs",
+    "lib": [
+      "esnext",
+      "es6",
+      "esnext.asynciterable"
+    ]
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

@@ -1,10 +1,10 @@
 {
   "name": "dbacked-agent",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Download and start the DBacked agent on your server",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build:ts": "tsc"
   },
   "repository": {
     "type": "git",
@@ -18,9 +18,12 @@
     "mysql"
   ],
   "author": "Guillaume Besson",
-  "license": "ISC",
+  "license": "GPL-3.0-only",
   "bugs": {
     "url": "https://github.com/dbacked/agent/issues"
   },
-  "homepage": "https://github.com/dbacked/agent#readme"
+  "homepage": "https://github.com/dbacked/agent#readme",
+  "devDependencies": {
+    "typescript": "^2.9.1"
+  }
 }

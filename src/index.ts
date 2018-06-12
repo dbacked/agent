@@ -49,25 +49,31 @@ const config: Config = {
   ),
 };
 
-assertExit(config.apikey, '--apikey is required');
-assertExit(config.dbType, '--db-type is required');
+assertExit(config.apikey && config.apikey.length, '--apikey is required');
+assertExit(config.dbType && config.dbType.length, '--db-type is required');
 assertExit(DB_TYPE[config.dbType], '--db-type should be pg or mysql');
-assertExit(config.dbHost, '--db-host is required');
-assertExit(config.dbUsername, '--db-username is required');
-assertExit(config.dbPassword, '--db-password is required');
-assertExit(config.dbName, '--db-name is required');
+assertExit(config.dbHost && config.dbHost.length, '--db-host is required');
+assertExit(config.dbUsername && config.dbUsername.length, '--db-username is required');
+assertExit(config.dbPassword && config.dbPassword.length, '--db-password is required');
+assertExit(config.dbName && config.dbName.length, '--db-name is required');
 
 if (!config.publicKey) {
   logger.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY, this could expose you to a man in the middle attack on your backups');
 }
 
 async function main() {
+  const agentId = await getOrGenerateAgentId({ directory: config.configDirectory });
+  logger.info('Agent id:', { agentId });
+  registerApiKey(config.apikey);
+  // Used to test the apiKey before daemonizing
+  await getProject();
   if (program.daemon) {
     const daemonName = program.daemonName ? `dbacked_${program.daemonName}` : 'dbacked';
     const lockDir = `/tmp/${daemonName}`;
     try {
       await mkdirPromise(lockDir);
     } catch (e) {}
+    // TODO check version of daemonized process and kill it if different
     if (await lockfile.check(lockDir)) {
       logger.error('A daemon is already running, use the --daemon-name params if you need to launch it multiple time');
       process.exit(1);
@@ -75,9 +81,6 @@ async function main() {
     daemon();
     await lockfile.lock(lockDir);
   }
-  const agentId = await getOrGenerateAgentId({ directory: config.configDirectory });
-  logger.info('Agent id:', { agentId });
-  registerApiKey(config.apikey);
   let backup;
   while (true) {
     const project = await getProject();

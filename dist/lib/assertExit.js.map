@@ -1,0 +1,1 @@
+{"version":3,"file":"assertExit.js","sourceRoot":"","sources":["../../src/lib/assertExit.ts"],"names":[],"mappings":";;AAAA,MAAM,UAAU,GAAG,CAAC,IAAI,EAAE,OAAO,EAAE,EAAE;IACnC,IAAI,CAAC,IAAI,EAAE;QACT,OAAO,CAAC,KAAK,CAAC,OAAO,CAAC,CAAC;QACvB,OAAO,CAAC,IAAI,CAAC,CAAC,CAAC,CAAC;KACjB;AACH,CAAC,CAAC;AAEF,kBAAe,UAAU,CAAC"}

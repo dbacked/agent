@@ -15,6 +15,7 @@ export const startAgent = async (options: DBackedAgentOption) => {
     DBACKED_DB_USERNAME: options.db.user,
     DBACKED_DB_PASSWORD: options.db.password,
     DBACKED_DB_NAME: options.db.database,
+    ...process.env,
   };
   if (options.publicKey) {
     agentEnv.DBACKED_PUBLIC_KEY = options.publicKey;
@@ -24,8 +25,7 @@ export const startAgent = async (options: DBackedAgentOption) => {
     agentArgs.push('--daemon-name');
     agentArgs.push(options.daemonName);
   }
-  const { stdout } = await execFilePromisified(agentPath, agentArgs, {
+  await execFilePromisified(agentPath, agentArgs, {
     env: agentEnv,
   });
-  console.log(stdout);
 };
