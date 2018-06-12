@@ -58,6 +58,7 @@ async function main() {
     log_1.default.info('Agent id:', { agentId });
     dbackedApi_1.registerApiKey(config.apikey);
     // Used to test the apiKey before daemonizing
+    // TODO: if ECONREFUSED, try again 5 minutes later
     await dbackedApi_1.getProject();
     if (program.daemon) {
         const daemonName = program.daemonName ? `dbacked_${program.daemonName}` : 'dbacked';
