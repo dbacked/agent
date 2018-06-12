@@ -1,4 +1,4 @@
-export const API_ROOT = 'http://localhost:5000';
+export const API_ROOT = 'https://api.dbacked.com';
 export const LOG_LEVEL = 'debug';
 
 export enum DB_TYPE {
