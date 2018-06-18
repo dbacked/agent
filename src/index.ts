@@ -1,5 +1,4 @@
 import * as program from 'commander';
-import { resolve } from 'path';
 import { createHash } from 'crypto';
 import * as MultiStream from 'multistream';
 import { PassThrough } from 'stream';
@@ -8,16 +7,15 @@ import * as lockfile from 'proper-lockfile';
 import { mkdir } from 'fs';
 import { promisify } from 'util';
 
-import assertExit from './lib/assertExit';
 import { getProject, registerApiKey, createBackup, getUploadPartUrl, finishUpload, reportError } from './lib/dbackedApi';
 import { delay } from './lib/delay';
-import { getOrGenerateAgentId } from './lib/agentId';
 import logger from './lib/log';
 import { checkDbDumpProgram } from './lib/dbDumpProgram';
-import { DB_TYPE, Config } from './lib/config';
+import { getAndCheckConfig } from './lib/config';
 import { startBackup, createBackupKey } from './lib/dbBackup';
 import { uploadToS3 } from './lib/s3';
 import { createReadStream } from './lib/streamHelpers';
+import { installAgent } from './lib/installAgent';
 
 const VERSION = [0, 0, 1];
 const mkdirPromise = promisify(mkdir);
@@ -32,38 +30,25 @@ program.version(VERSION.join('.'))
   .option('--public-key <publicKey>', 'Public key linked to the project (env variable: DBACKED_PUBLIC_KEY)')
   .option('--config-directory <directory>', 'Directory where the agent id and others files are stored, default $HOME/.dbacked')
   .option('--daemon', 'Detach the process as a daemon, will check if another daemon is not already started')
-  .option('--daemon-name <name>', 'Allows multiple daemons to be started at the same time under different names')
-  .parse(process.argv);
+  .option('--daemon-name <name>', 'Allows multiple daemons to be started at the same time under different names');
 
-const config: Config = {
-  apikey: program.apikey || process.env.DBACKED_APIKEY,
-  publicKey: program.publicKey || process.env.DBACKED_PUBLIC_KEY,
-  dbType: program.dbType || process.env.DBACKED_DB_TYPE,
-  dbHost: program.dbHost || process.env.DBACKED_DB_HOST,
-  dbUsername: program.dbUsername || process.env.DBACKED_DB_USERNAME,
-  dbPassword: program.dbPassword || process.env.DBACKED_DB_PASSWORD,
-  dbName: program.dbName || process.env.DBACKED_DB_NAME,
-  configDirectory: program.configDirectory || resolve(
-    process.env[(process.platform === 'win32') ? 'USERPROFILE' : 'HOME'],
-    '.dbacked',
-  ),
-};
-
-assertExit(config.apikey && config.apikey.length, '--apikey is required');
-assertExit(config.dbType && config.dbType.length, '--db-type is required');
-assertExit(DB_TYPE[config.dbType], '--db-type should be pg or mysql');
-assertExit(config.dbHost && config.dbHost.length, '--db-host is required');
-assertExit(config.dbUsername && config.dbUsername.length, '--db-username is required');
-assertExit(config.dbPassword && config.dbPassword.length, '--db-password is required');
-assertExit(config.dbName && config.dbName.length, '--db-name is required');
-
-if (!config.publicKey) {
-  logger.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY, this could expose you to a man in the middle attack on your backups');
-}
+let initCalled = false;
+program.command('init')
+  .option('--config-directory <directory>', 'Directory where the agent id and others files are stored, default $HOME/.dbacked')
+  .action(() => {
+    // Cannot do anything else because of this issue https://github.com/tj/commander.js/issues/729
+    initCalled = true;
+    installAgent(program);
+  });
 
 async function main() {
-  const agentId = await getOrGenerateAgentId({ directory: config.configDirectory });
-  logger.info('Agent id:', { agentId });
+  // TODO: block exec as root: https://github.com/sindresorhus/sudo-block#api
+  if (initCalled) {
+    return;
+  }
+  const config = await getAndCheckConfig(program);
+
+  logger.info('Agent id:', { agentId: config.agentId });
   registerApiKey(config.apikey);
   // Used to test the apiKey before daemonizing
   // TODO: if ECONREFUSED, try again 5 minutes later
@@ -90,7 +75,7 @@ async function main() {
     }
     try {
       const backupInfo = await createBackup({
-        agentId,
+        agentId: config.agentId,
         agentVersion: VERSION.join('.'),
         publicKey: config.publicKey,
         dbType: config.dbType,
@@ -104,7 +89,6 @@ async function main() {
       const { backupStream, iv } = await startBackup(backupKey, config);
 
       const magicStream = createReadStream(Buffer.from('DBACKED'));
-      // need to align to 4 so prepending 0 to version buffer
       const versionStream = createReadStream(Buffer.from([...VERSION]));
       const encryptedKeyLengthStream = createReadStream(Buffer.from(<ArrayBuffer>(new Uint32Array([encryptedKey.length])).buffer));
       const encryptedKeyStream = createReadStream(encryptedKey);
@@ -128,7 +112,7 @@ async function main() {
         generateBackupUrl: async ({ partNumber, partHash }) => {
           logger.debug('Getting multipart upload URL for part number', { partNumber });
           const { partUploadUrl } = await getUploadPartUrl({
-            backup, partNumber, agentId, hash: partHash,
+            backup, partNumber, agentId: config.agentId, hash: partHash,
           });
           return partUploadUrl;
         },
@@ -136,7 +120,7 @@ async function main() {
       logger.info('Informing server the upload is finished');
       hash.end();
       await finishUpload({
-        backup, partsEtag, hash: hash.digest('base64'), agentId,
+        backup, partsEtag, hash: hash.digest('base64'), agentId: config.agentId,
       });
       logger.info('backup finished !');
       backup = undefined;
@@ -145,7 +129,11 @@ async function main() {
         logger.info('No backup needed, waiting 5 minutes');
       } else {
         if (backup) {
-          await reportError({ backup, error: e.code || (e.response && e.response.data) || e.message, agentId });
+          await reportError({
+            backup,
+            error: e.code || (e.response && e.response.data) || e.message,
+            agentId: config.agentId,
+          });
         }
         logger.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e.message });
       }
@@ -154,4 +142,5 @@ async function main() {
   }
 }
 
+program.parse(process.argv);
 main();

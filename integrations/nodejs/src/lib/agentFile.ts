@@ -7,11 +7,16 @@ import { fileExists, waitForStreamEnd, chmodExec, getFileMd5 } from './fs';
 import { getFileHttps } from './request';
 import { AGENT_URL, AGENT_MD5_URL } from './constants';
 
-export const getAgentPath = () => {
+export const getAgentDirectory = () => {
   const directory = resolve(
     process.env[(process.platform === 'win32') ? 'USERPROFILE' : 'HOME'],
     '.dbacked',
   );
+  return directory;
+};
+
+export const getAgentPath = () => {
+  const directory = getAgentDirectory();
   const agentPath = resolve(directory, 'agent');
   return agentPath;
 };

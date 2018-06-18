@@ -8,7 +8,7 @@ const log_1 = require("./log");
 // import { delay } from './delay';
 const CHUNK_SIZE = 5 * 1024 * 1024;
 exports.uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
-    log_1.default.debug('Starting S3 upload');
+    log_1.default.info('Starting backup upload');
     let partNumber = 1;
     const promisifedStream = new promise_readable_1.PromiseReadable(fileStream);
     const partsEtag = [];

@@ -25,4 +25,3 @@ export const waitForStreamEnd = (stream: Stream) => {
 export const chmodExec = async (path) => {
   await chmodPromise(path, '755');
 };
-

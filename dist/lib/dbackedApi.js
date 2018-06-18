@@ -19,11 +19,9 @@ exports.getProject = async () => {
     }
     catch (e) {
         if (e.response && e.response.data && e.response.data.status === 401) {
-            log_1.default.error('Invalid API key');
-            process.exit(1);
+            throw new Error('Invalid API key');
         }
-        log_1.default.error('Unknow error while identifing to the DBacked server:', { code: e.code });
-        process.exit(1);
+        throw new Error('Unknow error while identifing to the DBacked server');
     }
 };
 exports.createBackup = async ({ agentId, agentVersion, publicKey, dbType, }) => {

@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const program = require("commander");
-const path_1 = require("path");
 const crypto_1 = require("crypto");
 const MultiStream = require("multistream");
 const stream_1 = require("stream");
@@ -9,16 +8,15 @@ const daemon = require("daemonize-process");
 const lockfile = require("proper-lockfile");
 const fs_1 = require("fs");
 const util_1 = require("util");
-const assertExit_1 = require("./lib/assertExit");
 const dbackedApi_1 = require("./lib/dbackedApi");
 const delay_1 = require("./lib/delay");
-const agentId_1 = require("./lib/agentId");
 const log_1 = require("./lib/log");
 const dbDumpProgram_1 = require("./lib/dbDumpProgram");
 const config_1 = require("./lib/config");
 const dbBackup_1 = require("./lib/dbBackup");
 const s3_1 = require("./lib/s3");
 const streamHelpers_1 = require("./lib/streamHelpers");
+const installAgent_1 = require("./lib/installAgent");
 const VERSION = [0, 0, 1];
 const mkdirPromise = util_1.promisify(fs_1.mkdir);
 program.version(VERSION.join('.'))
@@ -31,31 +29,22 @@ program.version(VERSION.join('.'))
     .option('--public-key <publicKey>', 'Public key linked to the project (env variable: DBACKED_PUBLIC_KEY)')
     .option('--config-directory <directory>', 'Directory where the agent id and others files are stored, default $HOME/.dbacked')
     .option('--daemon', 'Detach the process as a daemon, will check if another daemon is not already started')
-    .option('--daemon-name <name>', 'Allows multiple daemons to be started at the same time under different names')
-    .parse(process.argv);
-const config = {
-    apikey: program.apikey || process.env.DBACKED_APIKEY,
-    publicKey: program.publicKey || process.env.DBACKED_PUBLIC_KEY,
-    dbType: program.dbType || process.env.DBACKED_DB_TYPE,
-    dbHost: program.dbHost || process.env.DBACKED_DB_HOST,
-    dbUsername: program.dbUsername || process.env.DBACKED_DB_USERNAME,
-    dbPassword: program.dbPassword || process.env.DBACKED_DB_PASSWORD,
-    dbName: program.dbName || process.env.DBACKED_DB_NAME,
-    configDirectory: program.configDirectory || path_1.resolve(process.env[(process.platform === 'win32') ? 'USERPROFILE' : 'HOME'], '.dbacked'),
-};
-assertExit_1.default(config.apikey && config.apikey.length, '--apikey is required');
-assertExit_1.default(config.dbType && config.dbType.length, '--db-type is required');
-assertExit_1.default(config_1.DB_TYPE[config.dbType], '--db-type should be pg or mysql');
-assertExit_1.default(config.dbHost && config.dbHost.length, '--db-host is required');
-assertExit_1.default(config.dbUsername && config.dbUsername.length, '--db-username is required');
-assertExit_1.default(config.dbPassword && config.dbPassword.length, '--db-password is required');
-assertExit_1.default(config.dbName && config.dbName.length, '--db-name is required');
-if (!config.publicKey) {
-    log_1.default.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY, this could expose you to a man in the middle attack on your backups');
-}
+    .option('--daemon-name <name>', 'Allows multiple daemons to be started at the same time under different names');
+let initCalled = false;
+program.command('init')
+    .option('--config-directory <directory>', 'Directory where the agent id and others files are stored, default $HOME/.dbacked')
+    .action(() => {
+    // Cannot do anything else because of this issue https://github.com/tj/commander.js/issues/729
+    initCalled = true;
+    installAgent_1.installAgent(program);
+});
 async function main() {
-    const agentId = await agentId_1.getOrGenerateAgentId({ directory: config.configDirectory });
-    log_1.default.info('Agent id:', { agentId });
+    // TODO: block exec as root: https://github.com/sindresorhus/sudo-block#api
+    if (initCalled) {
+        return;
+    }
+    const config = await config_1.getAndCheckConfig(program);
+    log_1.default.info('Agent id:', { agentId: config.agentId });
     dbackedApi_1.registerApiKey(config.apikey);
     // Used to test the apiKey before daemonizing
     // TODO: if ECONREFUSED, try again 5 minutes later
@@ -83,7 +72,7 @@ async function main() {
         }
         try {
             const backupInfo = await dbackedApi_1.createBackup({
-                agentId,
+                agentId: config.agentId,
                 agentVersion: VERSION.join('.'),
                 publicKey: config.publicKey,
                 dbType: config.dbType,
@@ -95,7 +84,6 @@ async function main() {
             const { key: backupKey, encryptedKey } = await dbBackup_1.createBackupKey(config.publicKey);
             const { backupStream, iv } = await dbBackup_1.startBackup(backupKey, config);
             const magicStream = streamHelpers_1.createReadStream(Buffer.from('DBACKED'));
-            // need to align to 4 so prepending 0 to version buffer
             const versionStream = streamHelpers_1.createReadStream(Buffer.from([...VERSION]));
             const encryptedKeyLengthStream = streamHelpers_1.createReadStream(Buffer.from((new Uint32Array([encryptedKey.length])).buffer));
             const encryptedKeyStream = streamHelpers_1.createReadStream(encryptedKey);
@@ -117,7 +105,7 @@ async function main() {
                 generateBackupUrl: async ({ partNumber, partHash }) => {
                     log_1.default.debug('Getting multipart upload URL for part number', { partNumber });
                     const { partUploadUrl } = await dbackedApi_1.getUploadPartUrl({
-                        backup, partNumber, agentId, hash: partHash,
+                        backup, partNumber, agentId: config.agentId, hash: partHash,
                     });
                     return partUploadUrl;
                 },
@@ -125,7 +113,7 @@ async function main() {
             log_1.default.info('Informing server the upload is finished');
             hash.end();
             await dbackedApi_1.finishUpload({
-                backup, partsEtag, hash: hash.digest('base64'), agentId,
+                backup, partsEtag, hash: hash.digest('base64'), agentId: config.agentId,
             });
             log_1.default.info('backup finished !');
             backup = undefined;
@@ -136,7 +124,11 @@ async function main() {
             }
             else {
                 if (backup) {
-                    await dbackedApi_1.reportError({ backup, error: e.code || (e.response && e.response.data) || e.message, agentId });
+                    await dbackedApi_1.reportError({
+                        backup,
+                        error: e.code || (e.response && e.response.data) || e.message,
+                        agentId: config.agentId,
+                    });
                 }
                 log_1.default.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e.message });
             }
@@ -144,5 +136,6 @@ async function main() {
         await delay_1.delay(5 * 60 * 1000);
     }
 }
+program.parse(process.argv);
 main();
 //# sourceMappingURL=index.js.map

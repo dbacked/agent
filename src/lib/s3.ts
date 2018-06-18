@@ -9,7 +9,7 @@ import logger from './log';
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
 export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
-  logger.debug('Starting S3 upload');
+  logger.info('Starting backup upload');
   let partNumber = 1;
   const promisifedStream = new PromiseReadable(fileStream);
   const partsEtag = [];

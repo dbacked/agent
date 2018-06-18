@@ -20,11 +20,9 @@ export const getProject = async () => {
     return data;
   } catch (e) {
     if (e.response && e.response.data && e.response.data.status === 401) {
-      logger.error('Invalid API key');
-      process.exit(1);
+      throw new Error('Invalid API key');
     }
-    logger.error('Unknow error while identifing to the DBacked server:', { code: e.code });
-    process.exit(1);
+    throw new Error('Unknow error while identifing to the DBacked server');
   }
 };
 
