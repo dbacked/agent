@@ -33,57 +33,61 @@ const saveConfig = async (configDirectory, config) => {
   try {
     await writeFilePromisified(filePath, JSON.stringify(Object.assign({}, configContent, config), null, 4));
   } catch (e) {
-    logger.error('Couldn\'t save JSON config file, using temp agentId', { filePath, error: e.message });
+    logger.error('Couldn\'t save JSON config file', { filePath, error: e.message });
   }
 };
 
-const askAndCreateConfigFile = async (configDirectory) => {
-  let configFileContent:any = {};
+const askAndCreateConfigFile = async (configDirectory, { interactive }) => {
+  let config:any = {};
   try {
-    configFileContent = await getConfigFileContent(configDirectory);
+    config = await getConfigFileContent(configDirectory);
   } catch (e) {}
-  const config = await prompt([
-    {
-      type: 'input',
-      name: 'apikey',
-      default: configFileContent.apikey,
-      async validate(apikey) {
-        registerApiKey(apikey);
-        await getProject();
-        return true;
+  if (interactive) {
+    const responses = await prompt([
+      {
+        type: 'input',
+        name: 'apikey',
+        default: config.apikey,
+        async validate(apikey) {
+          registerApiKey(apikey);
+          await getProject();
+          return true;
+        },
+      }, {
+        type: 'list',
+        name: 'dbType',
+        default: config.dbType,
+        message: 'DB type:',
+        choices: ['pg', 'mysql'],
+      }, {
+        name: 'dbHost',
+        message: 'DB host:',
+        default: config.dbHost,
+        validate: requiredResponse,
+      }, {
+        name: 'dbUsername',
+        message: 'DB username:',
+        default: config.dbUsername,
+        validate: requiredResponse,
+      }, {
+        name: 'dbPassword',
+        message: 'DB password:',
+        default: config.dbPassword,
+        validate: requiredResponse,
+      }, {
+        name: 'dbName',
+        message: 'DB name:',
+        default: config.dbName,
+        validate: requiredResponse,
+      }, {
+        name: 'agentId',
+        default: config.agentId,
+        message: 'Server name [OPTIONNAL]',
       },
-    }, {
-      type: 'list',
-      name: 'dbType',
-      default: configFileContent.dbType,
-      message: 'DB type:',
-      choices: ['pg', 'mysql'],
-    }, {
-      name: 'dbHost',
-      message: 'DB host:',
-      default: configFileContent.dbHost,
-      validate: requiredResponse,
-    }, {
-      name: 'dbUsername',
-      message: 'DB username:',
-      default: configFileContent.dbUsername,
-      validate: requiredResponse,
-    }, {
-      name: 'dbPassword',
-      message: 'DB password:',
-      default: configFileContent.dbPassword,
-      validate: requiredResponse,
-    }, {
-      name: 'dbName',
-      message: 'DB name:',
-      default: configFileContent.dbName,
-      validate: requiredResponse,
-    }, {
-      name: 'agentId',
-      default: configFileContent.agentId,
-      message: 'Server name [OPTIONNAL]',
-    },
-  ]);
+    ]);
+    Object.assign(config, responses);
+  }
+  registerApiKey(config.apikey);
   config.publicKey = (await getProject()).publicKey;
   await saveConfig(configDirectory, config);
   return config;
@@ -120,8 +124,8 @@ export const installAgent = async (commandLine) => {
     console.error('Should be executed as root to install (as we are creating a systemd service)');
     process.exit(1);
   }
-  const configDirectory = commandLine.configDirectory || '/etc/dbacked';
-  await askAndCreateConfigFile(configDirectory);
+  const configDirectory = '/etc/dbacked';
+  await askAndCreateConfigFile(configDirectory, { interactive: !!commandLine.interactive });
 
   if (process.execPath !== '/usr/local/bin/dbacked_agent') {
     logger.info('Moving binary to /usr/local/bin/dbacked_agent');

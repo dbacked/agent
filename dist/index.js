@@ -27,16 +27,16 @@ program.version(VERSION.join('.'))
     .option('--db-password <dbPassword>', '[REQUIRED] Database password (env variable: DBACKED_DB_PASSWORD)')
     .option('--db-name <dbName>', '[REQUIRED] Database name (env variable: DBACKED_DB_NAME)')
     .option('--public-key <publicKey>', 'Public key linked to the project (env variable: DBACKED_PUBLIC_KEY)')
-    .option('--config-directory <directory>', 'Directory where the agent id and others files are stored, default $HOME/.dbacked')
+    .option('--config-directory <directory>', 'Directory where the agent id and others files are stored, default /etc/dbacked')
     .option('--daemon', 'Detach the process as a daemon, will check if another daemon is not already started')
     .option('--daemon-name <name>', 'Allows multiple daemons to be started at the same time under different names');
 let initCalled = false;
 program.command('init')
-    .option('--config-directory <directory>', 'Directory where the agent id and others files are stored, default $HOME/.dbacked')
-    .action(() => {
+    .option('--no-interactive', 'Disable the questions and directly read responses in the config file: /etc/dbacked/config.json')
+    .action((cmd) => {
     // Cannot do anything else because of this issue https://github.com/tj/commander.js/issues/729
     initCalled = true;
-    installAgent_1.installAgent(program);
+    installAgent_1.installAgent(cmd);
 });
 async function main() {
     // TODO: block exec as root: https://github.com/sindresorhus/sudo-block#api

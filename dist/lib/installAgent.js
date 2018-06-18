@@ -35,57 +35,61 @@ const saveConfig = async (configDirectory, config) => {
         await writeFilePromisified(filePath, JSON.stringify(Object.assign({}, configContent, config), null, 4));
     }
     catch (e) {
-        log_1.default.error('Couldn\'t save JSON config file, using temp agentId', { filePath, error: e.message });
+        log_1.default.error('Couldn\'t save JSON config file', { filePath, error: e.message });
     }
 };
-const askAndCreateConfigFile = async (configDirectory) => {
-    let configFileContent = {};
+const askAndCreateConfigFile = async (configDirectory, { interactive }) => {
+    let config = {};
     try {
-        configFileContent = await config_1.getConfigFileContent(configDirectory);
+        config = await config_1.getConfigFileContent(configDirectory);
     }
     catch (e) { }
-    const config = await inquirer_1.prompt([
-        {
-            type: 'input',
-            name: 'apikey',
-            default: configFileContent.apikey,
-            async validate(apikey) {
-                dbackedApi_1.registerApiKey(apikey);
-                await dbackedApi_1.getProject();
-                return true;
+    if (interactive) {
+        const responses = await inquirer_1.prompt([
+            {
+                type: 'input',
+                name: 'apikey',
+                default: config.apikey,
+                async validate(apikey) {
+                    dbackedApi_1.registerApiKey(apikey);
+                    await dbackedApi_1.getProject();
+                    return true;
+                },
+            }, {
+                type: 'list',
+                name: 'dbType',
+                default: config.dbType,
+                message: 'DB type:',
+                choices: ['pg', 'mysql'],
+            }, {
+                name: 'dbHost',
+                message: 'DB host:',
+                default: config.dbHost,
+                validate: requiredResponse,
+            }, {
+                name: 'dbUsername',
+                message: 'DB username:',
+                default: config.dbUsername,
+                validate: requiredResponse,
+            }, {
+                name: 'dbPassword',
+                message: 'DB password:',
+                default: config.dbPassword,
+                validate: requiredResponse,
+            }, {
+                name: 'dbName',
+                message: 'DB name:',
+                default: config.dbName,
+                validate: requiredResponse,
+            }, {
+                name: 'agentId',
+                default: config.agentId,
+                message: 'Server name [OPTIONNAL]',
             },
-        }, {
-            type: 'list',
-            name: 'dbType',
-            default: configFileContent.dbType,
-            message: 'DB type:',
-            choices: ['pg', 'mysql'],
-        }, {
-            name: 'dbHost',
-            message: 'DB host:',
-            default: configFileContent.dbHost,
-            validate: requiredResponse,
-        }, {
-            name: 'dbUsername',
-            message: 'DB username:',
-            default: configFileContent.dbUsername,
-            validate: requiredResponse,
-        }, {
-            name: 'dbPassword',
-            message: 'DB password:',
-            default: configFileContent.dbPassword,
-            validate: requiredResponse,
-        }, {
-            name: 'dbName',
-            message: 'DB name:',
-            default: configFileContent.dbName,
-            validate: requiredResponse,
-        }, {
-            name: 'agentId',
-            default: configFileContent.agentId,
-            message: 'Server name [OPTIONNAL]',
-        },
-    ]);
+        ]);
+        Object.assign(config, responses);
+    }
+    dbackedApi_1.registerApiKey(config.apikey);
     config.publicKey = (await dbackedApi_1.getProject()).publicKey;
     await saveConfig(configDirectory, config);
     return config;
@@ -120,8 +124,8 @@ exports.installAgent = async (commandLine) => {
         console.error('Should be executed as root to install (as we are creating a systemd service)');
         process.exit(1);
     }
-    const configDirectory = commandLine.configDirectory || '/etc/dbacked';
-    await askAndCreateConfigFile(configDirectory);
+    const configDirectory = '/etc/dbacked';
+    await askAndCreateConfigFile(configDirectory, { interactive: !!commandLine.interactive });
     if (process.execPath !== '/usr/local/bin/dbacked_agent') {
         log_1.default.info('Moving binary to /usr/local/bin/dbacked_agent');
         copyFilePromisified(process.execPath, '/usr/local/bin/dbacked_agent');
