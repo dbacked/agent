@@ -28,6 +28,7 @@ export const startBackup = async (backupKey, config: Config) => {
   const dumpProcess = await spawn(resolve(config.configDirectory, `${config.dbType}_dump`), args, {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
+  logger.debug('Started dump process');
 
   if (config.dbType === 'pg') {
     dumpProcess.stdin.write(config.dbPassword);

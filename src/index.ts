@@ -1,3 +1,8 @@
+if (process.env.DEBUG_MODE) {
+  const longjohn = require('longjohn');
+  longjohn.async_trace_limit = -1;
+}
+
 import * as program from 'commander';
 import { createHash } from 'crypto';
 import * as MultiStream from 'multistream';
@@ -7,7 +12,7 @@ import * as lockfile from 'proper-lockfile';
 import { mkdir } from 'fs';
 import { promisify } from 'util';
 
-import { getProject, registerApiKey, createBackup, getUploadPartUrl, finishUpload, reportError } from './lib/dbackedApi';
+import { getProject, registerApiKey, createBackup, getUploadPartUrl, finishUpload } from './lib/dbackedApi';
 import { delay } from './lib/delay';
 import logger from './lib/log';
 import { checkDbDumpProgram } from './lib/dbDumpProgram';
@@ -16,6 +21,7 @@ import { startBackup, createBackupKey } from './lib/dbBackup';
 import { uploadToS3 } from './lib/s3';
 import { createReadStream } from './lib/streamHelpers';
 import { installAgent } from './lib/installAgent';
+import { reportErrorSync } from './lib/reportError';
 
 const VERSION = [0, 0, 1];
 const mkdirPromise = promisify(mkdir);
@@ -41,12 +47,14 @@ program.command('init')
     installAgent(cmd);
   });
 
+let backup;
+let config;
 async function main() {
   // TODO: block exec as root: https://github.com/sindresorhus/sudo-block#api
   if (initCalled) {
     return;
   }
-  const config = await getAndCheckConfig(program);
+  config = await getAndCheckConfig(program);
 
   logger.info('Agent id:', { agentId: config.agentId });
   registerApiKey(config.apikey);
@@ -67,7 +75,6 @@ async function main() {
     daemon();
     await lockfile.lock(lockDir);
   }
-  let backup;
   while (true) {
     const project = await getProject();
     if (!config.publicKey) {
@@ -103,7 +110,6 @@ async function main() {
       ]);
       // Need a passthrough because else the stream is just consumed by the hash
       const uploadingStream = new PassThrough();
-
       backupFileStream.pipe(hash);
       backupFileStream.pipe(uploadingStream);
 
@@ -129,10 +135,11 @@ async function main() {
         logger.info('No backup needed, waiting 5 minutes');
       } else {
         if (backup) {
-          await reportError({
+          await reportErrorSync({
             backup,
-            error: e.code || (e.response && e.response.data) || e.message,
+            e,
             agentId: config.agentId,
+            apikey: config.apikey,
           });
         }
         logger.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e.message });
@@ -142,5 +149,20 @@ async function main() {
   }
 }
 
+process.on('uncaughtException', (e) => {
+  console.error('UNCAUGHT EXCEPTION');
+  console.error(e);
+  reportErrorSync({
+    backup,
+    e,
+    agentId: config.agentId,
+    apikey: config.apikey,
+  });
+  process.exit(1);
+});
+
 program.parse(process.argv);
-main();
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

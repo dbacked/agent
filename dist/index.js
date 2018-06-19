@@ -1,5 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+if (process.env.DEBUG_MODE) {
+    const longjohn = require('longjohn');
+    longjohn.async_trace_limit = -1;
+}
 const program = require("commander");
 const crypto_1 = require("crypto");
 const MultiStream = require("multistream");
@@ -17,6 +21,7 @@ const dbBackup_1 = require("./lib/dbBackup");
 const s3_1 = require("./lib/s3");
 const streamHelpers_1 = require("./lib/streamHelpers");
 const installAgent_1 = require("./lib/installAgent");
+const reportError_1 = require("./lib/reportError");
 const VERSION = [0, 0, 1];
 const mkdirPromise = util_1.promisify(fs_1.mkdir);
 program.version(VERSION.join('.'))
@@ -38,12 +43,14 @@ program.command('init')
     initCalled = true;
     installAgent_1.installAgent(cmd);
 });
+let backup;
+let config;
 async function main() {
     // TODO: block exec as root: https://github.com/sindresorhus/sudo-block#api
     if (initCalled) {
         return;
     }
-    const config = await config_1.getAndCheckConfig(program);
+    config = await config_1.getAndCheckConfig(program);
     log_1.default.info('Agent id:', { agentId: config.agentId });
     dbackedApi_1.registerApiKey(config.apikey);
     // Used to test the apiKey before daemonizing
@@ -64,7 +71,6 @@ async function main() {
         daemon();
         await lockfile.lock(lockDir);
     }
-    let backup;
     while (true) {
         const project = await dbackedApi_1.getProject();
         if (!config.publicKey) {
@@ -124,10 +130,11 @@ async function main() {
             }
             else {
                 if (backup) {
-                    await dbackedApi_1.reportError({
+                    await reportError_1.reportErrorSync({
                         backup,
-                        error: e.code || (e.response && e.response.data) || e.message,
+                        e,
                         agentId: config.agentId,
+                        apikey: config.apikey,
                     });
                 }
                 log_1.default.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e.message });
@@ -136,6 +143,20 @@ async function main() {
         await delay_1.delay(5 * 60 * 1000);
     }
 }
+process.on('uncaughtException', (e) => {
+    console.error('UNCAUGHT EXCEPTION');
+    console.error(e);
+    reportError_1.reportErrorSync({
+        backup,
+        e,
+        agentId: config.agentId,
+        apikey: config.apikey,
+    });
+    process.exit(1);
+});
 program.parse(process.argv);
-main();
+main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+});
 //# sourceMappingURL=index.js.map

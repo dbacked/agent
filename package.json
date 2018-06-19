@@ -26,6 +26,7 @@
     "daemonize-process": "^1.0.9",
     "inquirer": "^6.0.0",
     "is-root": "^2.0.0",
+    "longjohn": "^0.2.12",
     "mkdirp": "^0.5.1",
     "mkdirp2": "^1.0.4",
     "multistream": "^2.1.1",

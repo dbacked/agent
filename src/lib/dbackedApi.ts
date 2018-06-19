@@ -1,7 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
 import { API_ROOT } from './config';
-import logger from './log';
 
 let api: AxiosInstance;
 
@@ -63,16 +62,3 @@ export const finishUpload = async ({
   return data;
 };
 
-export const reportError = async ({ backup, error, agentId }) => {
-  try {
-    logger.info('Sending error to DBacked API for alerting');
-    await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
-      status: 'ERROR',
-      error,
-      agentId,
-    });
-  } catch (e) {
-    console.error(e, e.response && e.response.data);
-    logger.warn('Couldn\'t send error message to dbacked server', { error: e.message });
-  }
-};

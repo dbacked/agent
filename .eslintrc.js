@@ -15,7 +15,9 @@ module.exports = {
       "no-await-in-loop": 0,
       'no-plusplus': 0,
       "no-loop-func": 0,
-      "no-underscore-dangle": 0
+      "no-underscore-dangle": 0,
+      "import/first": 0,
+      "global-require": 0
   },
   "plugins": [
       "typescript",
