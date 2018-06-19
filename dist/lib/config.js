@@ -110,6 +110,9 @@ exports.getAndCheckConfig = async (commandLine) => {
     if (!config.publicKey) {
         log_1.default.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY or publicKey config key, this could expose you to a man in the middle attack on your backups');
     }
+    if (!config.dumpProgramsDirectory) {
+        config.dumpProgramsDirectory = '/tmp/dbacked_dumpers';
+    }
     return config;
 };
 //# sourceMappingURL=config.js.map

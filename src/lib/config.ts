@@ -24,6 +24,7 @@ export interface Config {
   dbPassword: string;
   dbName: string;
   configDirectory: string;
+  dumpProgramsDirectory: string;
 }
 
 const readFilePromisified = promisify(readFile);
@@ -121,6 +122,9 @@ export const getAndCheckConfig = async (commandLine) => {
 
   if (!config.publicKey) {
     logger.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY or publicKey config key, this could expose you to a man in the middle attack on your backups');
+  }
+  if (!config.dumpProgramsDirectory) {
+    config.dumpProgramsDirectory = '/tmp/dbacked_dumpers';
   }
 
   return <Config>config;

@@ -26,10 +26,11 @@ exports.startBackup = async (backupKey, config) => {
     }
     const iv = await randomBytesPromise(128 / 8);
     const cipher = crypto_1.createCipheriv('aes256', backupKey, iv);
-    const dumpProcess = await child_process_1.spawn(path_1.resolve(config.configDirectory, `${config.dbType}_dump`), args, {
+    const dumpProcess = await child_process_1.spawn(path_1.resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`, 'dump'), args, {
         stdio: 'pipe',
         env: {
             PGPASSWORD: config.dbPassword,
+            LD_LIBRARY_PATH: path_1.resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`),
         },
     });
     log_1.default.debug('Started dump process');

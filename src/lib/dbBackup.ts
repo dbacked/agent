@@ -28,12 +28,13 @@ export const startBackup = async (backupKey, config: Config) => {
   const iv = await randomBytesPromise(128 / 8);
   const cipher = createCipheriv('aes256', backupKey, iv);
   const dumpProcess = await spawn(
-    resolve(config.configDirectory, `${config.dbType}_dump`),
+    resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`, 'dump'),
     args,
     {
       stdio: 'pipe',
       env: {
         PGPASSWORD: config.dbPassword,
+        LD_LIBRARY_PATH: resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`),
       },
     },
   );

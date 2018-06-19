@@ -89,7 +89,7 @@ async function main() {
       });
       backup = backupInfo.backup;
       // TODO test for mysql
-      await checkDbDumpProgram(config.dbType, config.configDirectory);
+      await checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
       const hash = createHash('md5');
 
       const { key: backupKey, encryptedKey } = await createBackupKey(config.publicKey);
