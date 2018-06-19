@@ -30,11 +30,10 @@ exports.startBackup = async (backupKey, config) => {
         stdio: ['pipe', 'pipe', 'pipe'],
     });
     log_1.default.debug('Started dump process');
-    if (config.dbType === 'pg') {
+    if (config.dbType === 'pg' && config.dbPassword && dumpProcess.stdin.writable) {
         log_1.default.debug('Writing password');
-        dumpProcess.stdin.write(config.dbPassword);
-        dumpProcess.stdin.write('\n');
-        dumpProcess.stdin.end();
+        dumpProcess.stdin.end(`${config.dbPassword}\n`);
+        log_1.default.debug('Wrote password');
     }
     await waitForProcessStart_1.waitForProcessStart(dumpProcess);
     log_1.default.debug('Dump process started');

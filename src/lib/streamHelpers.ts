@@ -1,4 +1,4 @@
-import { Readable } from 'stream';
+import { Readable, Writable } from 'stream';
 import { inherits } from 'util';
 
 function MultiStream(object, options?) {
@@ -24,4 +24,3 @@ MultiStream.prototype._read = function _read() {
 export const createReadStream = (object, options?) => {
   return new MultiStream(object, options);
 };
-

@@ -32,11 +32,10 @@ export const startBackup = async (backupKey, config: Config) => {
   });
   logger.debug('Started dump process');
 
-  if (config.dbType === 'pg') {
+  if (config.dbType === 'pg' && config.dbPassword && dumpProcess.stdin.writable) {
     logger.debug('Writing password');
-    dumpProcess.stdin.write(config.dbPassword);
-    dumpProcess.stdin.write('\n');
-    dumpProcess.stdin.end();
+    dumpProcess.stdin.end(`${config.dbPassword}\n`);
+    logger.debug('Wrote password');
   }
 
   await waitForProcessStart(dumpProcess);
