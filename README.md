@@ -32,6 +32,14 @@ You can install the binary on your server directly. It's useful if you want to s
 
 Download the latest binary from [https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent](https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent) ([MD5 here](https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent_md5)) and configure your server to start it on startup.
 
+### Docker
+
+You can use the agent as a Docker container: `docker run -d geekuillaume/dbacked_agent dbacked_agent --apikey YOUR_API_KEY --db-type pg --db-host DB_HOST --db-username DB_USERNAME --db-password DB_PASSWORD --db-name DB_NAME`. You can also use `mysql` instead of `pg`.
+
+To test it first before daemonizing it, remove the `-d` arg in the command.
+
+The container needs access to your database. If you are using a postgres or mysql container on Docker too, don't forget to use the `--link` argument.
+
 ### Manual compilation
 
 If you want to be sure of what you're installing on your servers, you can manually compile the binary.
