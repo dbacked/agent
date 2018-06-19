@@ -6,22 +6,24 @@ exports.waitForProcessStart = (childProcess) => {
     return new Promise((resolve, reject) => {
         let processStderr = '';
         log_1.default.debug('Listening on dump process stderr');
-        childProcess.stderr.on('data', (data) => { processStderr += data; });
+        childProcess.stderr.addListener('data', (data) => { processStderr += data; });
         log_1.default.debug('Listening on dump process close event');
-        childProcess.on('close', (code) => {
+        childProcess.addListener('close', (code) => {
             log_1.default.debug('Child process close event fired', { code });
             if (code !== 0) {
                 reject(new error_1.DbError(processStderr));
             }
         });
         log_1.default.debug('Listening on dump process readable event');
-        childProcess.stdout.once('readable', () => {
+        const waitForReadable = () => {
             log_1.default.debug('Child process readable event fired');
             if (childProcess.stdout.readableLength) {
                 log_1.default.debug('Child process readableLength is > 0', { readableLength: childProcess.stdout.readableLength });
+                childProcess.stdout.removeListener('readable', waitForReadable);
                 resolve();
             }
-        });
+        };
+        childProcess.stdout.addListener('readable', waitForReadable);
     });
 };
 //# sourceMappingURL=waitForProcessStart.js.map
