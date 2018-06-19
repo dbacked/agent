@@ -16,9 +16,9 @@ exports.fileExists = async (path) => {
         return false;
     }
 };
-exports.waitForStreamEnd = (stream) => {
+exports.waitForStreamEnd = (stream, eventName = 'end') => {
     return new Promise((resolve) => {
-        stream.on('end', () => {
+        stream.on(eventName, () => {
             resolve();
         });
     });
@@ -31,6 +31,7 @@ exports.computeFolderContentMd5 = async (directory) => {
     if (!filesName.length) {
         return '';
     }
+    console.log(filesName);
     const filesStream = filesName.sort().map((filename) => fs_1.createReadStream(filename));
     const md5 = crypto_1.createHash('md5');
     const concatenatedFileStream = new MultiStream(filesStream);

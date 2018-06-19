@@ -31,8 +31,9 @@ exports.checkDbDumpProgram = async (type, directory) => {
         const response = await axios_1.default.get(fileUrl, {
             responseType: 'stream',
         });
-        response.data.pipe(unzip.Extract({ path: dumpProgramDirectory }));
-        await fs_1.waitForStreamEnd(response.data);
+        const unzipper = unzip.Extract({ path: dumpProgramDirectory });
+        response.data.pipe(unzipper);
+        await fs_1.waitForStreamEnd(unzipper, 'close');
         log_1.default.info('Finished downloading db dumpprogram');
         await fs_1.chmodExec(path_1.resolve(dumpProgramDirectory, 'dump'));
     }
