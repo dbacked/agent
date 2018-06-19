@@ -100,6 +100,7 @@ async function main() {
       const encryptedKeyLengthStream = createReadStream(Buffer.from(<ArrayBuffer>(new Uint32Array([encryptedKey.length])).buffer));
       const encryptedKeyStream = createReadStream(encryptedKey);
       const ivStream = createReadStream(iv);
+      logger.debug('Creating multistream');
       const backupFileStream = MultiStream([
         magicStream,
         versionStream,

@@ -13,7 +13,7 @@ exports.startBackup = async (backupKey, config) => {
     if (config.dbType === 'pg') {
         args = [
             '-U', config.dbUsername, '-h', config.dbHost,
-            '-Z', '7', '--format=c',
+            '-Z', '7', '--format=c', '-W',
             config.dbName,
         ];
     }
@@ -24,19 +24,22 @@ exports.startBackup = async (backupKey, config) => {
             config.dbName,
         ];
     }
+    const iv = await randomBytesPromise(128 / 8);
+    const cipher = crypto_1.createCipheriv('aes256', backupKey, iv);
     const dumpProcess = await child_process_1.spawn(path_1.resolve(config.configDirectory, `${config.dbType}_dump`), args, {
         stdio: ['pipe', 'pipe', 'pipe'],
     });
     log_1.default.debug('Started dump process');
     if (config.dbType === 'pg') {
+        log_1.default.debug('Writing password');
         dumpProcess.stdin.write(config.dbPassword);
         dumpProcess.stdin.write('\n');
         dumpProcess.stdin.end();
     }
     await waitForProcessStart_1.waitForProcessStart(dumpProcess);
-    const iv = await randomBytesPromise(128 / 8);
-    const cipher = crypto_1.createCipheriv('aes256', backupKey, iv);
+    log_1.default.debug('Dump process started');
     dumpProcess.stdout.pipe(cipher);
+    log_1.default.debug('Piped to cipher');
     return {
         backupStream: cipher,
         iv,
