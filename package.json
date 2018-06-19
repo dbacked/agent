@@ -27,6 +27,7 @@
     "inquirer": "^6.0.0",
     "is-root": "^2.0.0",
     "mkdirp": "^0.5.1",
+    "mkdirp2": "^1.0.4",
     "multistream": "^2.1.1",
     "promise-readable": "^3.1.5",
     "proper-lockfile": "^3.0.2",

@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const Winston = require("winston");
-const config_1 = require("./config");
+const LOG_LEVEL = 'debug';
 const logger = Winston.createLogger({
-    level: config_1.LOG_LEVEL,
+    level: LOG_LEVEL,
     format: Winston.format.json(),
     transports: [
         new Winston.transports.File({ filename: 'error.log', level: 'error' }),

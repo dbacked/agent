@@ -1,5 +1,6 @@
 import * as Winston from 'winston';
-import { LOG_LEVEL } from './config';
+
+const LOG_LEVEL = 'debug';
 
 const logger = Winston.createLogger({
   level: LOG_LEVEL,

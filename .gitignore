@@ -62,3 +62,4 @@ typings/
 tmp
 dbacked_agent
 dbacked_agent_md5
+.vscode
