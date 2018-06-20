@@ -4,26 +4,21 @@ if (process.env.DEBUG_MODE) {
 }
 
 import * as program from 'commander';
-import { createHash } from 'crypto';
-import * as MultiStream from 'multistream';
-import { PassThrough } from 'stream';
 import * as daemon from 'daemonize-process';
 import * as lockfile from 'proper-lockfile';
 import { mkdir } from 'fs';
 import { promisify } from 'util';
+import * as downgradeRoot from 'downgrade-root';
 
-import { getProject, registerApiKey, createBackup, getUploadPartUrl, finishUpload } from './lib/dbackedApi';
+import { getProject, registerApiKey } from './lib/dbackedApi';
 import { delay } from './lib/delay';
 import logger from './lib/log';
-import { checkDbDumpProgram } from './lib/dbDumpProgram';
 import { getAndCheckConfig } from './lib/config';
-import { startBackup, createBackupKey } from './lib/dbBackup';
-import { uploadToS3 } from './lib/s3';
-import { createReadStream } from './lib/streamHelpers';
 import { installAgent } from './lib/installAgent';
 import { reportErrorSync } from './lib/reportError';
+import { backupDatabase } from './lib/backup';
 
-const VERSION = [0, 0, 1];
+const VERSION = [0, 1, 0];
 const mkdirPromise = promisify(mkdir);
 
 program.version(VERSION.join('.'))
@@ -47,7 +42,6 @@ program.command('init')
     installAgent(cmd);
   });
 
-let backup;
 let config;
 async function main() {
   // TODO: block exec as root: https://github.com/sindresorhus/sudo-block#api
@@ -61,6 +55,7 @@ async function main() {
   // Used to test the apiKey before daemonizing
   // TODO: if ECONREFUSED, try again 5 minutes later
   await getProject();
+  downgradeRoot();
   if (program.daemon) {
     const daemonName = program.daemonName ? `dbacked_${program.daemonName}` : 'dbacked';
     const lockDir = `/tmp/${daemonName}`;
@@ -76,89 +71,24 @@ async function main() {
     await lockfile.lock(lockDir);
   }
   while (true) {
-    const project = await getProject();
-    if (!config.publicKey) {
-      config.publicKey = project.publicKey;
-    }
     try {
-      const backupInfo = await createBackup({
-        agentId: config.agentId,
-        agentVersion: VERSION.join('.'),
-        publicKey: config.publicKey,
-        dbType: config.dbType,
-      });
-      backup = backupInfo.backup;
-      // TODO test for mysql
-      await checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
-      const hash = createHash('md5');
-
-      const { key: backupKey, encryptedKey } = await createBackupKey(config.publicKey);
-      const { backupStream, iv } = await startBackup(backupKey, config);
-
-      const magicStream = createReadStream(Buffer.from('DBACKED'));
-      const versionStream = createReadStream(Buffer.from([...VERSION]));
-      const encryptedKeyLengthStream = createReadStream(Buffer.from(<ArrayBuffer>(new Uint32Array([encryptedKey.length])).buffer));
-      const encryptedKeyStream = createReadStream(encryptedKey);
-      const ivStream = createReadStream(iv);
-      logger.debug('Creating multistream');
-      const backupFileStream = MultiStream([
-        magicStream,
-        versionStream,
-        encryptedKeyLengthStream,
-        encryptedKeyStream,
-        ivStream,
-        backupStream,
-      ]);
-      // Need a passthrough because else the stream is just consumed by the hash
-      const uploadingStream = new PassThrough();
-      backupFileStream.pipe(hash);
-      backupFileStream.pipe(uploadingStream);
-
-      const partsEtag = await uploadToS3({
-        fileStream: uploadingStream,
-        generateBackupUrl: async ({ partNumber, partHash }) => {
-          logger.debug('Getting multipart upload URL for part number', { partNumber });
-          const { partUploadUrl } = await getUploadPartUrl({
-            backup, partNumber, agentId: config.agentId, hash: partHash,
-          });
-          return partUploadUrl;
-        },
-      });
-      logger.info('Informing server the upload is finished');
-      hash.end();
-      await finishUpload({
-        backup, partsEtag, hash: hash.digest('base64'), agentId: config.agentId,
-      });
-      logger.info('backup finished !');
-      backup = undefined;
+      await backupDatabase(config, VERSION);
+      await delay(5 * 60 * 1000);
     } catch (e) {
-      if (e.response && e.response.data && e.response.data.message === 'No backup needed for the moment') {
-        logger.info('No backup needed, waiting 5 minutes');
-      } else {
-        if (backup) {
-          await reportErrorSync({
-            backup,
-            e,
-            agentId: config.agentId,
-            apikey: config.apikey,
-          });
-        }
-        logger.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e.message });
-      }
+      await delay(60 * 60 * 1000); // Delay for an hour if got an error
     }
-    await delay(5 * 60 * 1000);
   }
 }
 
 process.on('uncaughtException', (e) => {
   console.error('UNCAUGHT EXCEPTION');
   console.error(e);
-  reportErrorSync({
-    backup,
-    e,
-    agentId: config.agentId,
-    apikey: config.apikey,
-  });
+  // reportErrorSync({
+  //   backup,
+  //   e,
+  //   agentId: config.agentId,
+  //   apikey: config.apikey,
+  // });
   process.exit(1);
 });
 

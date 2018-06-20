@@ -6,6 +6,7 @@ const util_1 = require("util");
 const crypto_1 = require("crypto");
 const log_1 = require("./log");
 const waitForProcessStart_1 = require("./waitForProcessStart");
+const zlib_1 = require("zlib");
 const randomBytesPromise = util_1.promisify(crypto_1.randomBytes);
 exports.startBackup = async (backupKey, config) => {
     log_1.default.debug('Starting dump');
@@ -13,7 +14,7 @@ exports.startBackup = async (backupKey, config) => {
     if (config.dbType === 'pg') {
         args = [
             '-U', config.dbUsername, '-h', config.dbHost,
-            '-Z', '7', '--format=c',
+            '--format=c',
             config.dbName,
         ];
     }
@@ -36,7 +37,9 @@ exports.startBackup = async (backupKey, config) => {
     log_1.default.debug('Started dump process');
     await waitForProcessStart_1.waitForProcessStart(dumpProcess);
     log_1.default.debug('Dump process started');
-    dumpProcess.stdout.pipe(cipher);
+    const gzip = zlib_1.createGzip();
+    dumpProcess.stdout.pipe(gzip);
+    gzip.pipe(cipher);
     log_1.default.debug('Piped to cipher');
     return {
         backupStream: cipher,

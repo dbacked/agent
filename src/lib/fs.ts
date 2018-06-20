@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import { Stream } from 'stream';
 import * as MultiStream from 'multistream';
 import { createHash } from 'crypto';
+import { resolve } from 'path';
 
 const statPromised = promisify(stat);
 const chmodPromised = promisify(chmod);
@@ -18,9 +19,9 @@ export const fileExists = async (path) => {
 };
 
 export const waitForStreamEnd = (stream: Stream, eventName = 'end') => {
-  return new Promise((resolve) => {
+  return new Promise((resolvePromise) => {
     stream.on(eventName, () => {
-      resolve();
+      resolvePromise();
     });
   });
 };
@@ -34,8 +35,9 @@ export const computeFolderContentMd5 = async (directory) => {
   if (!filesName.length) {
     return '';
   }
-  console.log(filesName);
-  const filesStream = filesName.sort().map((filename) => createReadStream(filename));
+  const filesStream = filesName
+    .sort()
+    .map((filename) => createReadStream(resolve(directory, filename)));
   const md5 = createHash('md5');
   const concatenatedFileStream = new MultiStream(filesStream);
   concatenatedFileStream.pipe(md5);

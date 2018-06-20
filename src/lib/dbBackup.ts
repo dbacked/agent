@@ -6,6 +6,7 @@ import { createCipheriv, randomBytes, publicEncrypt } from 'crypto';
 import logger from './log';
 import { Config } from './config';
 import { waitForProcessStart } from './waitForProcessStart';
+import { createGzip } from 'zlib';
 
 const randomBytesPromise = promisify(randomBytes);
 
@@ -15,7 +16,7 @@ export const startBackup = async (backupKey, config: Config) => {
   if (config.dbType === 'pg') {
     args = [
       '-U', config.dbUsername, '-h', config.dbHost,
-      '-Z', '7', '--format=c',
+      '--format=c',
       config.dbName,
     ];
   } else if (config.dbType === 'mysql') {
@@ -42,8 +43,9 @@ export const startBackup = async (backupKey, config: Config) => {
 
   await waitForProcessStart(dumpProcess);
   logger.debug('Dump process started');
-
-  dumpProcess.stdout.pipe(cipher);
+  const gzip = createGzip();
+  dumpProcess.stdout.pipe(gzip);
+  gzip.pipe(cipher);
   logger.debug('Piped to cipher');
   return {
     backupStream: cipher,
