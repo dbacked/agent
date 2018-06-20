@@ -1,6 +1,8 @@
 import axios, { AxiosInstance } from 'axios';
 
-import { API_ROOT } from './config';
+import { API_ROOT, VERSION } from './constants';
+import { delay } from './delay';
+import logger from './log';
 
 let api: AxiosInstance;
 
@@ -27,15 +29,31 @@ export const getProject = async () => {
 };
 
 export const createBackup = async ({
-  agentId, agentVersion, publicKey, dbType,
+  agentId, publicKey, dbType,
 }) => {
   const { data } = await api.post('projects/own/backups', {
     agentId,
-    agentVersion,
+    agentVersion: VERSION.join('.'),
     publicKey,
     dbType,
   });
   return data;
+};
+
+export const waitForBackup = async (config) => {
+  while (true) {
+    try {
+      const backupInfo = await createBackup(config);
+      return backupInfo;
+    } catch (e) {
+      if (e.response && e.response.data && e.response.data.message === 'No backup needed for the moment') {
+        logger.info('No backup needed, waiting 5 minutes');
+      } else {
+        throw e;
+      }
+    }
+    await delay(5 * 60 * 1000);
+  }
 };
 
 export const getUploadPartUrl = async ({
@@ -62,3 +80,15 @@ export const finishUpload = async ({
   return data;
 };
 
+export const reportError = async ({
+  backup, e, agentId,
+}) => {
+  logger.info('Sending error to DBacked API');
+  const error = `${e.code || (e.response && e.response.data) || e.message}\n${e.stack}`;
+  await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
+    status: 'ERROR',
+    agentId,
+    error,
+  });
+  logger.info('Sent error to DBacked API');
+};

@@ -7,8 +7,6 @@ import * as mkdirp from 'mkdirp';
 import logger from './log';
 import assertExit from './assertExit';
 
-export const API_ROOT = process.env.DBACKED_LOCAL_API ? 'http://localhost:5000' : 'https://api.dbacked.com';
-
 export enum DB_TYPE {
   pg = 'pg',
   mysql = 'mysql',

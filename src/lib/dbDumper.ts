@@ -10,7 +10,7 @@ import { createGzip } from 'zlib';
 
 const randomBytesPromise = promisify(randomBytes);
 
-export const startBackup = async (backupKey, config: Config) => {
+export const startDumper = async (backupKey, config: Config) => {
   logger.debug('Starting dump');
   let args;
   if (config.dbType === 'pg') {

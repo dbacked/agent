@@ -5,35 +5,29 @@ import { PassThrough } from 'stream';
 import { getProject, registerApiKey, createBackup, getUploadPartUrl, finishUpload } from './dbackedApi';
 import logger from './log';
 import { checkDbDumpProgram } from './dbDumpProgram';
-import { startBackup, createBackupKey } from './dbBackup';
+import { startDumper, createBackupKey } from './dbDumper';
 import { uploadToS3 } from './s3';
 import { createReadStream } from './streamHelpers';
-import { reportErrorSync } from './reportError';
+import { VERSION } from './constants';
 
 let backup;
 
-export const backupDatabase = async (config, VERSION) => {
-  registerApiKey(config.apikey);
-  // Used to test the apiKey before daemonizing
-  // TODO: if ECONREFUSED, try again 5 minutes later
-  const project = await getProject();
-  if (!config.publicKey) {
-    config.publicKey = project.publicKey;
-  }
+export const backupDatabase = async (config, backupInfo) => {
   try {
-    const backupInfo = await createBackup({
-      agentId: config.agentId,
-      agentVersion: VERSION.join('.'),
-      publicKey: config.publicKey,
-      dbType: config.dbType,
-    });
+    registerApiKey(config.apikey);
+    // Used to test the apiKey before daemonizing
+    // TODO: if ECONREFUSED, try again 5 minutes later
+    const project = await getProject();
+    if (!config.publicKey) {
+      config.publicKey = project.publicKey;
+    }
     backup = backupInfo.backup;
     // TODO test for mysql
     await checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
     const hash = createHash('md5');
 
     const { key: backupKey, encryptedKey } = await createBackupKey(config.publicKey);
-    const { backupStream, iv } = await startBackup(backupKey, config);
+    const { backupStream, iv } = await startDumper(backupKey, config);
 
     const magicStream = createReadStream(Buffer.from('DBACKED'));
     const versionStream = createReadStream(Buffer.from([...VERSION]));
@@ -70,20 +64,31 @@ export const backupDatabase = async (config, VERSION) => {
       backup, partsEtag, hash: hash.digest('base64'), agentId: config.agentId,
     });
     logger.info('backup finished !');
-    backup = undefined;
+    process.exit(0);
   } catch (e) {
-    if (e.response && e.response.data && e.response.data.message === 'No backup needed for the moment') {
-      logger.info('No backup needed, waiting 5 minutes');
-    } else {
-      logger.error('Unknown error while creating backup', { error: e.code || (e.response && e.response.data) || e.message });
-      if (backup) {
-        await reportErrorSync({
-          backup,
-          e,
-          agentId: config.agentId,
-          apikey: config.apikey,
-        });
-      }
-    }
+    logger.error('Unknown error while creating backup', { error: e.code || (e.response && e.response.data) || e.message });
+    process.send(JSON.stringify({
+      type: 'error',
+      payload: `${e.code || (e.response && e.response.data) || e.message}\n${e.stack}`,
+    }));
   }
 };
+
+process.on('message', (message) => {
+  try {
+    const { type, payload } = JSON.parse(message);
+    if (type === 'startBackup') {
+      backupDatabase(payload.config, payload.backupInfo);
+    }
+  } catch (e) {}
+});
+
+process.on('uncaughtException', (e) => {
+  console.error(e);
+  const error = <any>e;
+  process.send(JSON.stringify({
+    type: 'error',
+    payload: `${error.code || (error.response && error.responserror.data) || error.message}\n${error.stack}`,
+  }));
+  process.exit(1);
+});

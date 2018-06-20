@@ -15,10 +15,10 @@ const delay_1 = require("./lib/delay");
 const log_1 = require("./lib/log");
 const config_1 = require("./lib/config");
 const installAgent_1 = require("./lib/installAgent");
-const backup_1 = require("./lib/backup");
-const VERSION = [0, 1, 0];
+const constants_1 = require("./lib/constants");
+const backupJobManager_1 = require("./lib/backupJobManager");
 const mkdirPromise = util_1.promisify(fs_1.mkdir);
-program.version(VERSION.join('.'))
+program.version(constants_1.VERSION.join('.'))
     .option('--apikey <apikey>', '[REQUIRED] DBacked API key (can also be provided with the DBACKED_APIKEY env variable)')
     .option('--db-type <dbType>', '[REQUIRED] Database type (pg or mysql) (env variable: DBACKED_DB_TYPE)')
     .option('--db-host <dbHost>', '[REQUIRED] Database host (env variable: DBACKED_DB_HOST)')
@@ -38,6 +38,7 @@ program.command('init')
     installAgent_1.installAgent(cmd);
 });
 let config;
+let backupInfo;
 async function main() {
     // TODO: block exec as root: https://github.com/sindresorhus/sudo-block#api
     if (initCalled) {
@@ -66,24 +67,25 @@ async function main() {
         await lockfile.lock(lockDir);
     }
     while (true) {
+        backupInfo = null;
         try {
-            await backup_1.backupDatabase(config, VERSION);
-            await delay_1.delay(5 * 60 * 1000);
+            backupInfo = await dbackedApi_1.waitForBackup(config);
+            await backupJobManager_1.startDatabaseBackupJob(config, backupInfo);
+            await delay_1.delay(5 * 1000);
         }
         catch (e) {
+            await dbackedApi_1.reportError({
+                backup: backupInfo.backup,
+                e,
+                agentId: config.agentId,
+            });
             await delay_1.delay(60 * 60 * 1000); // Delay for an hour if got an error
         }
     }
 }
 process.on('uncaughtException', (e) => {
-    console.error('UNCAUGHT EXCEPTION');
+    console.error('Uncaught Error:');
     console.error(e);
-    // reportErrorSync({
-    //   backup,
-    //   e,
-    //   agentId: config.agentId,
-    //   apikey: config.apikey,
-    // });
     process.exit(1);
 });
 program.parse(process.argv);

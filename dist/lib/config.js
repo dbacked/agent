@@ -8,7 +8,6 @@ const randomstring = require("randomstring");
 const mkdirp = require("mkdirp");
 const log_1 = require("./log");
 const assertExit_1 = require("./assertExit");
-exports.API_ROOT = process.env.DBACKED_LOCAL_API ? 'http://localhost:5000' : 'https://api.dbacked.com';
 var DB_TYPE;
 (function (DB_TYPE) {
     DB_TYPE["pg"] = "pg";

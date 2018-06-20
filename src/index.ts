@@ -10,15 +10,14 @@ import { mkdir } from 'fs';
 import { promisify } from 'util';
 import * as downgradeRoot from 'downgrade-root';
 
-import { getProject, registerApiKey } from './lib/dbackedApi';
+import { getProject, registerApiKey, reportError, waitForBackup } from './lib/dbackedApi';
 import { delay } from './lib/delay';
 import logger from './lib/log';
 import { getAndCheckConfig } from './lib/config';
 import { installAgent } from './lib/installAgent';
-import { reportErrorSync } from './lib/reportError';
-import { backupDatabase } from './lib/backup';
+import { VERSION } from './lib/constants';
+import { startDatabaseBackupJob } from './lib/backupJobManager';
 
-const VERSION = [0, 1, 0];
 const mkdirPromise = promisify(mkdir);
 
 program.version(VERSION.join('.'))
@@ -43,6 +42,7 @@ program.command('init')
   });
 
 let config;
+let backupInfo;
 async function main() {
   // TODO: block exec as root: https://github.com/sindresorhus/sudo-block#api
   if (initCalled) {
@@ -71,24 +71,25 @@ async function main() {
     await lockfile.lock(lockDir);
   }
   while (true) {
+    backupInfo = null;
     try {
-      await backupDatabase(config, VERSION);
-      await delay(5 * 60 * 1000);
+      backupInfo = await waitForBackup(config);
+      await startDatabaseBackupJob(config, backupInfo);
+      await delay(5 * 1000);
     } catch (e) {
+      await reportError({
+        backup: backupInfo.backup,
+        e,
+        agentId: config.agentId,
+      });
       await delay(60 * 60 * 1000); // Delay for an hour if got an error
     }
   }
 }
 
 process.on('uncaughtException', (e) => {
-  console.error('UNCAUGHT EXCEPTION');
+  console.error('Uncaught Error:');
   console.error(e);
-  // reportErrorSync({
-  //   backup,
-  //   e,
-  //   agentId: config.agentId,
-  //   apikey: config.apikey,
-  // });
   process.exit(1);
 });
 

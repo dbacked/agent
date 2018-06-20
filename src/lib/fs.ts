@@ -38,7 +38,6 @@ export const computeFolderContentMd5 = async (directory) => {
   const filesStream = filesName
     .sort()
     .map((filename) => createReadStream(resolve(directory, filename)));
-  console.log(filesName.sort());
   const md5 = createHash('md5');
   const concatenatedFileStream = new MultiStream(filesStream);
   concatenatedFileStream.pipe(md5);
