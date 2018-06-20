@@ -21,7 +21,7 @@ export interface Config {
   dbType: DB_TYPE;
   dbHost: string;
   dbUsername: string;
-  dbPassword: string;
+  dbPassword?: string;
   dbName: string;
   configDirectory: string;
   dumpProgramsDirectory: string;
@@ -117,7 +117,6 @@ export const getAndCheckConfig = async (commandLine) => {
   assertExit(DB_TYPE[config.dbType], '--db-type should be pg or mysql');
   assertExit(config.dbHost && config.dbHost.length, '--db-host is required');
   assertExit(config.dbUsername && config.dbUsername.length, '--db-username is required');
-  assertExit(config.dbPassword && config.dbPassword.length, '--db-password is required');
   assertExit(config.dbName && config.dbName.length, '--db-name is required');
 
   if (!config.publicKey) {

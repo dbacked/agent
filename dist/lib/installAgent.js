@@ -73,9 +73,8 @@ const askAndCreateConfigFile = async (configDirectory, { interactive }) => {
                 validate: requiredResponse,
             }, {
                 name: 'dbPassword',
-                message: 'DB password:',
+                message: 'DB password: [OPTIONNAL]',
                 default: config.dbPassword,
-                validate: requiredResponse,
             }, {
                 name: 'dbName',
                 message: 'DB name:',

@@ -75,6 +75,7 @@ export const backupDatabase = async (config, VERSION) => {
     if (e.response && e.response.data && e.response.data.message === 'No backup needed for the moment') {
       logger.info('No backup needed, waiting 5 minutes');
     } else {
+      logger.error('Unknown error while creating backup', { error: e.code || (e.response && e.response.data) || e.message });
       if (backup) {
         await reportErrorSync({
           backup,
@@ -83,7 +84,6 @@ export const backupDatabase = async (config, VERSION) => {
           apikey: config.apikey,
         });
       }
-      logger.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e.message });
     }
   }
 };

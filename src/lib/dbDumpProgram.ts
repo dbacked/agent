@@ -11,14 +11,18 @@ import logger from './log';
 const mkdirpPromisifed = promisify(mkdirp);
 
 const needToDownloadDumpProgram = async (type, dumpProgramDirectory) => {
+  logger.debug('Getting dump programs MD5', { path: dumpProgramDirectory });
   await mkdirpPromisifed(dumpProgramDirectory);
   const existingMd5 = await computeFolderContentMd5(dumpProgramDirectory);
   const remoteMd5Url = {
     mysql: 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/mysql_md5',
     pg: 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/postgres_md5',
   }[type];
-  const remoteMd5 = (await Axios.get(remoteMd5Url)).toString();
-  return existingMd5 !== remoteMd5;
+  logger.debug('Got dump programs MD5', { md5: existingMd5 });
+  logger.debug('Getting remote dump programs MD5');
+  const remoteMd5 = await Axios.get(remoteMd5Url);
+  logger.debug('Got remote programs MD5', { md5: remoteMd5.data });
+  return existingMd5 !== remoteMd5.data;
 };
 
 export const checkDbDumpProgram = async (type: DB_TYPE, directory) => {

@@ -17,14 +17,20 @@ export const startBackup = async (backupKey, config: Config) => {
     args = [
       '-U', config.dbUsername, '-h', config.dbHost,
       '--format=c',
-      config.dbName,
     ];
+    if (!config.dbPassword) {
+      args.push('--no-password');
+    }
+    args.push(config.dbName);
   } else if (config.dbType === 'mysql') {
     args = [
       '-u', config.dbUsername, '-h', config.dbHost,
-      '-C', '--single-transaction', `--password=${config.dbPassword}`,
-      config.dbName,
+      '-C', '--single-transaction',
     ];
+    if (config.dbPassword) {
+      args.push(`--password=${config.dbPassword}`);
+    }
+    args.push(config.dbName);
   }
   const iv = await randomBytesPromise(128 / 8);
   const cipher = createCipheriv('aes256', backupKey, iv);
@@ -32,7 +38,7 @@ export const startBackup = async (backupKey, config: Config) => {
     resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`, 'dump'),
     args,
     {
-      stdio: 'pipe',
+      stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         PGPASSWORD: config.dbPassword,
         LD_LIBRARY_PATH: resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`),

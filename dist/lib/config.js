@@ -105,7 +105,6 @@ exports.getAndCheckConfig = async (commandLine) => {
     assertExit_1.default(DB_TYPE[config.dbType], '--db-type should be pg or mysql');
     assertExit_1.default(config.dbHost && config.dbHost.length, '--db-host is required');
     assertExit_1.default(config.dbUsername && config.dbUsername.length, '--db-username is required');
-    assertExit_1.default(config.dbPassword && config.dbPassword.length, '--db-password is required');
     assertExit_1.default(config.dbName && config.dbName.length, '--db-name is required');
     if (!config.publicKey) {
         log_1.default.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY or publicKey config key, this could expose you to a man in the middle attack on your backups');

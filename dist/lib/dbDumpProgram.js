@@ -9,14 +9,18 @@ const fs_1 = require("./fs");
 const log_1 = require("./log");
 const mkdirpPromisifed = util_1.promisify(mkdirp);
 const needToDownloadDumpProgram = async (type, dumpProgramDirectory) => {
+    log_1.default.debug('Getting dump programs MD5', { path: dumpProgramDirectory });
     await mkdirpPromisifed(dumpProgramDirectory);
     const existingMd5 = await fs_1.computeFolderContentMd5(dumpProgramDirectory);
     const remoteMd5Url = {
         mysql: 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/mysql_md5',
         pg: 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/postgres_md5',
     }[type];
-    const remoteMd5 = (await axios_1.default.get(remoteMd5Url)).toString();
-    return existingMd5 !== remoteMd5;
+    log_1.default.debug('Got dump programs MD5', { md5: existingMd5 });
+    log_1.default.debug('Getting remote dump programs MD5');
+    const remoteMd5 = await axios_1.default.get(remoteMd5Url);
+    log_1.default.debug('Got remote programs MD5', { md5: remoteMd5.data });
+    return existingMd5 !== remoteMd5.data;
 };
 exports.checkDbDumpProgram = async (type, directory) => {
     const dumpProgramDirectory = path_1.resolve(directory, `${type}_dumper`);

@@ -73,6 +73,7 @@ exports.backupDatabase = async (config, VERSION) => {
             log_1.default.info('No backup needed, waiting 5 minutes');
         }
         else {
+            log_1.default.error('Unknown error while creating backup', { error: e.code || (e.response && e.response.data) || e.message });
             if (backup) {
                 await reportError_1.reportErrorSync({
                     backup,
@@ -81,7 +82,6 @@ exports.backupDatabase = async (config, VERSION) => {
                     apikey: config.apikey,
                 });
             }
-            log_1.default.error('Unknown error while creating backup, waiting 5 minutes', { error: e.code || (e.response && e.response.data) || e.message });
         }
     }
 };
