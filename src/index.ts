@@ -73,10 +73,13 @@ async function main() {
   while (true) {
     backupInfo = null;
     try {
+      logger.debug('Waiting for backup job');
       backupInfo = await waitForBackup(config);
+      logger.debug('Got backup job');
       await startDatabaseBackupJob(config, backupInfo);
       await delay(5 * 1000);
     } catch (e) {
+      logger.error('Error while backuping', { e });
       await reportError({
         backup: backupInfo.backup,
         e,

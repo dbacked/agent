@@ -1,8 +1,8 @@
-import { compile } from 'nexe';
 import { resolve } from 'path';
 import { createHash } from 'crypto';
 import { writeFile, createReadStream, PathLike } from 'fs';
 import { promisify } from 'util';
+import { exec } from 'pkg';
 
 const writeFilePromisified = promisify(writeFile);
 
@@ -17,16 +17,18 @@ export const getFileMd5 = (filePath: PathLike) => {
   });
 };
 
-console.log('Compiling');
-compile({
-  input: resolve(__dirname, '../../dist/index.js'),
-  build: true,
-  targets: ['linux-x64'],
-  python: '/usr/bin/python2',
-  name: 'dbacked_agent',
-}).then(async () => {
-  console.log('Done !');
-  const md5 = await getFileMd5(resolve(__dirname, '../../dbacked_agent'));
-  await writeFilePromisified(resolve(__dirname, '../../dbacked_agent_md5'), md5);
-});
+const rootDir = resolve(__dirname, '../../');
 
+async function main() {
+  console.log('Compiling');
+  await exec([
+    resolve(rootDir, 'package.json'), '--output', resolve(rootDir, 'dbacked_agent'),
+    '--target', 'host',
+  ]);
+  console.log('Compiled');
+  const md5 = await getFileMd5(resolve(rootDir, 'dbacked_agent'));
+  await writeFilePromisified(resolve(rootDir, 'dbacked_agent_md5'), md5);
+  console.log('MD5 saved');
+}
+
+main();

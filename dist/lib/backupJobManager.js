@@ -4,7 +4,7 @@ const child_process_1 = require("child_process");
 const path_1 = require("path");
 exports.startDatabaseBackupJob = (config, backupInfo) => {
     return new Promise((resolvePromise, reject) => {
-        const runner = child_process_1.fork(path_1.resolve(__dirname, 'backupRunner.js'), [], {});
+        const runner = child_process_1.fork(path_1.resolve(__dirname, './backupRunner.js'));
         runner.send(JSON.stringify({
             type: 'startBackup',
             payload: {

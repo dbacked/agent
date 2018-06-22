@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import * as MultiStream from 'multistream';
 import { PassThrough } from 'stream';
 
-import { getProject, registerApiKey, createBackup, getUploadPartUrl, finishUpload } from './dbackedApi';
+import { getProject, registerApiKey, getUploadPartUrl, finishUpload } from './dbackedApi';
 import logger from './log';
 import { checkDbDumpProgram } from './dbDumpProgram';
 import { startDumper, createBackupKey } from './dbDumper';
@@ -12,6 +12,7 @@ import { VERSION } from './constants';
 
 let backup;
 
+logger.debug('Backup worker starting');
 export const backupDatabase = async (config, backupInfo) => {
   try {
     registerApiKey(config.apikey);

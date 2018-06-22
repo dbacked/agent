@@ -1,10 +1,9 @@
 import { fork } from 'child_process';
 import { resolve } from 'path';
 
-
 export const startDatabaseBackupJob = (config, backupInfo) => {
   return new Promise((resolvePromise, reject) => {
-    const runner = fork(resolve(__dirname, 'backupRunner.js'), [], {});
+    const runner = fork(resolve(__dirname, './backupRunner.js'));
     runner.send(JSON.stringify({
       type: 'startBackup',
       payload: {

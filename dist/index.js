@@ -69,11 +69,14 @@ async function main() {
     while (true) {
         backupInfo = null;
         try {
+            log_1.default.debug('Waiting for backup job');
             backupInfo = await dbackedApi_1.waitForBackup(config);
+            log_1.default.debug('Got backup job');
             await backupJobManager_1.startDatabaseBackupJob(config, backupInfo);
             await delay_1.delay(5 * 1000);
         }
         catch (e) {
+            log_1.default.error('Error while backuping', { e });
             await dbackedApi_1.reportError({
                 backup: backupInfo.backup,
                 e,

@@ -11,6 +11,10 @@
     "start:nobuild": "ts-node src/index.ts",
     "start:build": "tsc && node dist/index.js"
   },
+  "bin": "dist/index.js",
+  "pkg": {
+    "scripts": "dist/**/*.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dbacked/agent.git"
@@ -39,16 +43,16 @@
     "winston": "^3.0.0-rc3"
   },
   "devDependencies": {
+    "pkg": "^4.3.3",
     "@types/node": "^10.1.4",
-    "nexe": "^2.0.0-rc.28",
-    "nodemon": "^1.17.5",
-    "ts-node": "^6.0.5",
-    "typescript": "^2.8.4",
-    "typescript-eslint-parser": "^15.0.0",
     "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
     "eslint-plugin-import": "^2.9.0",
     "eslint-plugin-jest": "^21.15.0",
-    "eslint-plugin-typescript": "^0.12.0"
+    "eslint-plugin-typescript": "^0.12.0",
+    "nodemon": "^1.17.5",
+    "ts-node": "^6.0.5",
+    "typescript": "^2.8.4",
+    "typescript-eslint-parser": "^15.0.0"
   }
 }

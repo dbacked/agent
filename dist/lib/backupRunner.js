@@ -11,6 +11,7 @@ const s3_1 = require("./s3");
 const streamHelpers_1 = require("./streamHelpers");
 const constants_1 = require("./constants");
 let backup;
+log_1.default.debug('Backup worker starting');
 exports.backupDatabase = async (config, backupInfo) => {
     try {
         dbackedApi_1.registerApiKey(config.apikey);
