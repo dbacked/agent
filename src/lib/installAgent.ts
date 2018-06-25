@@ -8,7 +8,7 @@ import { exec } from 'child_process';
 
 import logger from './log';
 import { registerApiKey, getProject } from './dbackedApi';
-import { getConfigFileContent } from './config';
+import { getConfig, askForConfig } from './config';
 
 const readFilePromisified = promisify(readFile);
 const mkdirpPromisified = promisify(mkdirp);
@@ -16,7 +16,6 @@ const writeFilePromisified = promisify(writeFile);
 const copyFilePromisified = promisify(copyFile);
 const execPromisified = promisify(exec);
 
-const requiredResponse = (input) => !!input || 'Required';
 
 const saveConfig = async (configDirectory, config) => {
   try {
@@ -37,58 +36,15 @@ const saveConfig = async (configDirectory, config) => {
   }
 };
 
-const askAndCreateConfigFile = async (configDirectory, { interactive }) => {
-  let config:any = {};
-  try {
-    config = await getConfigFileContent(configDirectory);
-  } catch (e) {}
+const askAndCreateConfigFile = async (sourceConfig, { interactive }) => {
+  const config:any = Object.assign({}, sourceConfig);
   if (interactive) {
-    const responses = await prompt([
-      {
-        type: 'input',
-        name: 'apikey',
-        default: config.apikey,
-        async validate(apikey) {
-          registerApiKey(apikey);
-          await getProject();
-          return true;
-        },
-      }, {
-        type: 'list',
-        name: 'dbType',
-        default: config.dbType,
-        message: 'DB type:',
-        choices: ['pg', 'mysql'],
-      }, {
-        name: 'dbHost',
-        message: 'DB host:',
-        default: config.dbHost,
-        validate: requiredResponse,
-      }, {
-        name: 'dbUsername',
-        message: 'DB username:',
-        default: config.dbUsername,
-        validate: requiredResponse,
-      }, {
-        name: 'dbPassword',
-        message: 'DB password: [OPTIONNAL]',
-        default: config.dbPassword,
-      }, {
-        name: 'dbName',
-        message: 'DB name:',
-        default: config.dbName,
-        validate: requiredResponse,
-      }, {
-        name: 'agentId',
-        default: config.agentId,
-        message: 'Server name [OPTIONNAL]',
-      },
-    ]);
+    const responses = await askForConfig(config);
     Object.assign(config, responses);
   }
   registerApiKey(config.apikey);
   config.publicKey = (await getProject()).publicKey;
-  await saveConfig(configDirectory, config);
+  await saveConfig(config.configDirectory, config);
   return config;
 };
 
@@ -123,8 +79,8 @@ export const installAgent = async (commandLine) => {
     console.error('Should be executed as root to install (as we are creating a systemd service)');
     process.exit(1);
   }
-  const configDirectory = '/etc/dbacked';
-  await askAndCreateConfigFile(configDirectory, { interactive: !!commandLine.y });
+  const config = await getConfig(commandLine);
+  await askAndCreateConfigFile(config, { interactive: !commandLine.y });
 
   if (process.execPath !== '/usr/local/bin/dbacked_agent') {
     logger.info('Moving binary to /usr/local/bin/dbacked_agent');

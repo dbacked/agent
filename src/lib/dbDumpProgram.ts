@@ -43,5 +43,6 @@ export const checkDbDumpProgram = async (type: DB_TYPE, directory) => {
     await waitForStreamEnd(unzipper, 'close');
     logger.info('Finished downloading db dumpprogram');
     await chmodExec(resolve(dumpProgramDirectory, 'dump'));
+    await chmodExec(resolve(dumpProgramDirectory, 'restore'));
   }
 };

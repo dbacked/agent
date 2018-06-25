@@ -1,6 +1,6 @@
 import * as Winston from 'winston';
 
-const LOG_LEVEL = 'debug';
+const LOG_LEVEL = process.env.DBACKED_DEBUG ? 'debug' : 'info';
 
 const logger = Winston.createLogger({
   level: LOG_LEVEL,

@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const Winston = require("winston");
-const LOG_LEVEL = 'debug';
+const LOG_LEVEL = process.env.DBACKED_DEBUG ? 'debug' : 'info';
 const logger = Winston.createLogger({
     level: LOG_LEVEL,
     format: Winston.format.json(),

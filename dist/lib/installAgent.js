@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const util_1 = require("util");
 const fs_1 = require("fs");
 const mkdirp = require("mkdirp");
-const inquirer_1 = require("inquirer");
 const path_1 = require("path");
 const isRoot = require("is-root");
 const child_process_1 = require("child_process");
@@ -15,7 +14,6 @@ const mkdirpPromisified = util_1.promisify(mkdirp);
 const writeFilePromisified = util_1.promisify(fs_1.writeFile);
 const copyFilePromisified = util_1.promisify(fs_1.copyFile);
 const execPromisified = util_1.promisify(child_process_1.exec);
-const requiredResponse = (input) => !!input || 'Required';
 const saveConfig = async (configDirectory, config) => {
     try {
         await mkdirpPromisified(configDirectory);
@@ -38,59 +36,15 @@ const saveConfig = async (configDirectory, config) => {
         log_1.default.error('Couldn\'t save JSON config file', { filePath, error: e.message });
     }
 };
-const askAndCreateConfigFile = async (configDirectory, { interactive }) => {
-    let config = {};
-    try {
-        config = await config_1.getConfigFileContent(configDirectory);
-    }
-    catch (e) { }
+const askAndCreateConfigFile = async (sourceConfig, { interactive }) => {
+    const config = Object.assign({}, sourceConfig);
     if (interactive) {
-        const responses = await inquirer_1.prompt([
-            {
-                type: 'input',
-                name: 'apikey',
-                default: config.apikey,
-                async validate(apikey) {
-                    dbackedApi_1.registerApiKey(apikey);
-                    await dbackedApi_1.getProject();
-                    return true;
-                },
-            }, {
-                type: 'list',
-                name: 'dbType',
-                default: config.dbType,
-                message: 'DB type:',
-                choices: ['pg', 'mysql'],
-            }, {
-                name: 'dbHost',
-                message: 'DB host:',
-                default: config.dbHost,
-                validate: requiredResponse,
-            }, {
-                name: 'dbUsername',
-                message: 'DB username:',
-                default: config.dbUsername,
-                validate: requiredResponse,
-            }, {
-                name: 'dbPassword',
-                message: 'DB password: [OPTIONNAL]',
-                default: config.dbPassword,
-            }, {
-                name: 'dbName',
-                message: 'DB name:',
-                default: config.dbName,
-                validate: requiredResponse,
-            }, {
-                name: 'agentId',
-                default: config.agentId,
-                message: 'Server name [OPTIONNAL]',
-            },
-        ]);
+        const responses = await config_1.askForConfig(config);
         Object.assign(config, responses);
     }
     dbackedApi_1.registerApiKey(config.apikey);
     config.publicKey = (await dbackedApi_1.getProject()).publicKey;
-    await saveConfig(configDirectory, config);
+    await saveConfig(config.configDirectory, config);
     return config;
 };
 const installSystemdService = async () => {
@@ -123,8 +77,8 @@ exports.installAgent = async (commandLine) => {
         console.error('Should be executed as root to install (as we are creating a systemd service)');
         process.exit(1);
     }
-    const configDirectory = '/etc/dbacked';
-    await askAndCreateConfigFile(configDirectory, { interactive: !!commandLine.y });
+    const config = await config_1.getConfig(commandLine);
+    await askAndCreateConfigFile(config, { interactive: !commandLine.y });
     if (process.execPath !== '/usr/local/bin/dbacked_agent') {
         log_1.default.info('Moving binary to /usr/local/bin/dbacked_agent');
         copyFilePromisified(process.execPath, '/usr/local/bin/dbacked_agent');

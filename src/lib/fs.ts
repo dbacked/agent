@@ -1,10 +1,11 @@
-import { stat, chmod, readdir, createReadStream } from 'fs';
+import { stat, chmod, readdir, createReadStream, readFile } from 'fs';
 import { promisify } from 'util';
 import { Stream } from 'stream';
 import * as MultiStream from 'multistream';
 import { createHash } from 'crypto';
 import { resolve } from 'path';
 
+export const readFilePromisified = promisify(readFile);
 const statPromised = promisify(stat);
 const chmodPromised = promisify(chmod);
 const readdirPromisifed = promisify(readdir);

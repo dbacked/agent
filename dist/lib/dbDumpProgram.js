@@ -40,6 +40,7 @@ exports.checkDbDumpProgram = async (type, directory) => {
         await fs_1.waitForStreamEnd(unzipper, 'close');
         log_1.default.info('Finished downloading db dumpprogram');
         await fs_1.chmodExec(path_1.resolve(dumpProgramDirectory, 'dump'));
+        await fs_1.chmodExec(path_1.resolve(dumpProgramDirectory, 'restore'));
     }
 };
 //# sourceMappingURL=dbDumpProgram.js.map

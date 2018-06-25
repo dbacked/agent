@@ -92,3 +92,9 @@ export const reportError = async ({
   });
   logger.info('Sent error to DBacked API');
 };
+
+export const getBackupDownloadUrl = async (backup) => {
+  const { data } = await api.get(`projects/${backup.projectId}/backups/${backup.id}/downloadUrl`);
+  return data.downloadUrl;
+};
+

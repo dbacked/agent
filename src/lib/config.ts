@@ -2,10 +2,12 @@ import { resolve } from 'path';
 import { promisify } from 'util';
 import { readFile, writeFile } from 'fs';
 import { hostname } from 'os';
+import { prompt } from 'inquirer';
 import * as randomstring from 'randomstring';
 import * as mkdirp from 'mkdirp';
 import logger from './log';
 import assertExit from './assertExit';
+import { getProject, registerApiKey } from './dbackedApi';
 
 export enum DB_TYPE {
   pg = 'pg',
@@ -80,7 +82,7 @@ const saveAgentId = async (config: Config) => {
   }
 };
 
-export const getAndCheckConfig = async (commandLine) => {
+export const getConfig = async (commandLine) => {
   let config:any = {
     configDirectory: commandLine.configDirectory || '/etc/dbacked',
   };
@@ -110,19 +112,79 @@ export const getAndCheckConfig = async (commandLine) => {
     config.agentId = `${hostname()}-${randomstring.generate(4)}`;
     await saveAgentId(config);
   }
-  assertExit(config.apikey && config.apikey.length, '--apikey is required');
-  assertExit(config.dbType && config.dbType.length, '--db-type is required');
-  assertExit(DB_TYPE[config.dbType], '--db-type should be pg or mysql');
-  assertExit(config.dbHost && config.dbHost.length, '--db-host is required');
-  assertExit(config.dbUsername && config.dbUsername.length, '--db-username is required');
-  assertExit(config.dbName && config.dbName.length, '--db-name is required');
-
-  if (!config.publicKey) {
-    logger.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY or publicKey config key, this could expose you to a man in the middle attack on your backups');
-  }
   if (!config.dumpProgramsDirectory) {
     config.dumpProgramsDirectory = '/tmp/dbacked_dumpers';
   }
 
   return <Config>config;
 };
+
+export const getAndCheckConfig = async (commandLine) => {
+  const config = await getConfig(commandLine);
+  [{
+    field: config.apikey, arg: '--apikey', env: 'DBACKED_APIKEY', confName: 'apikey',
+  }, {
+    field: config.dbType, arg: '--db-type', env: 'DBACKED_DB_TYPE', confName: 'dbType',
+  }, {
+    field: config.dbHost, arg: '--db-host', env: 'DBACKED_DB_HOST', confName: 'dbHost',
+  }, {
+    field: config.dbUsername, arg: '--db-username', env: 'DBACKED_DB_USERNAME', confName: 'dbUsername',
+  }, {
+    field: config.dbName, arg: '--db-name', env: 'DBACKED_DB_NAME', confName: 'dbName',
+  }].forEach(({
+    field, arg, env, confName,
+  }) => {
+    assertExit(field && field.length, `${arg}, ${env} env variable or ${confName} config field required`);
+  });
+  if (!config.publicKey) {
+    logger.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY or publicKey config key, this could expose you to a man in the middle attack on your backups');
+  }
+  return config;
+};
+
+const requiredResponse = (input) => !!input || 'Required';
+
+export const askForConfig = async (config) => {
+  return prompt([
+    {
+      type: 'input',
+      name: 'apikey',
+      default: config.apikey,
+      async validate(apikey) {
+        registerApiKey(apikey);
+        await getProject();
+        return true;
+      },
+    }, {
+      type: 'list',
+      name: 'dbType',
+      default: config.dbType,
+      message: 'DB type:',
+      choices: ['pg', 'mysql'],
+    }, {
+      name: 'dbHost',
+      message: 'DB host:',
+      default: config.dbHost,
+      validate: requiredResponse,
+    }, {
+      name: 'dbUsername',
+      message: 'DB username:',
+      default: config.dbUsername,
+      validate: requiredResponse,
+    }, {
+      name: 'dbPassword',
+      message: 'DB password: [OPTIONNAL]',
+      default: config.dbPassword,
+    }, {
+      name: 'dbName',
+      message: 'DB name:',
+      default: config.dbName,
+      validate: requiredResponse,
+    }, {
+      name: 'agentId',
+      default: config.agentId,
+      message: 'Server name [OPTIONNAL]',
+    },
+  ]);
+};
+

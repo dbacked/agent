@@ -80,4 +80,8 @@ exports.reportError = async ({ backup, e, agentId, }) => {
     });
     log_1.default.info('Sent error to DBacked API');
 };
+exports.getBackupDownloadUrl = async (backup) => {
+    const { data } = await api.get(`projects/${backup.projectId}/backups/${backup.id}/downloadUrl`);
+    return data.downloadUrl;
+};
 //# sourceMappingURL=dbackedApi.js.map

@@ -5,6 +5,7 @@ const util_1 = require("util");
 const MultiStream = require("multistream");
 const crypto_1 = require("crypto");
 const path_1 = require("path");
+exports.readFilePromisified = util_1.promisify(fs_1.readFile);
 const statPromised = util_1.promisify(fs_1.stat);
 const chmodPromised = util_1.promisify(fs_1.chmod);
 const readdirPromisifed = util_1.promisify(fs_1.readdir);
