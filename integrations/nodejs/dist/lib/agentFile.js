@@ -14,8 +14,12 @@ const https_1 = require("https");
 const fs_2 = require("./fs");
 const request_1 = require("./request");
 const constants_1 = require("./constants");
-exports.getAgentPath = () => {
+exports.getAgentDirectory = () => {
     const directory = path_1.resolve(process.env[(process.platform === 'win32') ? 'USERPROFILE' : 'HOME'], '.dbacked');
+    return directory;
+};
+exports.getAgentPath = () => {
+    const directory = exports.getAgentDirectory();
     const agentPath = path_1.resolve(directory, 'agent');
     return agentPath;
 };

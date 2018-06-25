@@ -1,6 +1,6 @@
 {
   "name": "dbacked-agent",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "",
   "main": "src/index.js",
   "scripts": {
@@ -27,7 +27,6 @@
   "homepage": "https://github.com/dbacked/agent#readme",
   "dependencies": {
     "axios": "^0.18.0",
-    "commander": "^2.15.1",
     "daemonize-process": "^1.0.9",
     "downgrade-root": "^1.2.2",
     "inquirer": "^6.0.0",
@@ -40,17 +39,19 @@
     "proper-lockfile": "^3.0.2",
     "randomstring": "^1.1.5",
     "unzip-stream": "^0.3.0",
-    "winston": "^3.0.0-rc3"
+    "winston": "^3.0.0-rc3",
+    "yargs": "^11.0.0"
   },
   "devDependencies": {
-    "pkg": "^4.3.3",
     "@types/node": "^10.1.4",
+    "@types/yargs": "^11.0.0",
     "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
     "eslint-plugin-import": "^2.9.0",
     "eslint-plugin-jest": "^21.15.0",
     "eslint-plugin-typescript": "^0.12.0",
     "nodemon": "^1.17.5",
+    "pkg": "^4.3.3",
     "ts-node": "^6.0.5",
     "typescript": "^2.8.4",
     "typescript-eslint-parser": "^15.0.0"

@@ -26,11 +26,10 @@ exports.getProject = async () => {
         throw new Error('Unknow error while identifing to the DBacked server');
     }
 };
-exports.createBackup = async ({ agentId, publicKey, dbType, }) => {
+exports.createBackup = async ({ agentId, dbType, }) => {
     const { data } = await api.post('projects/own/backups', {
         agentId,
         agentVersion: constants_1.VERSION.join('.'),
-        publicKey,
         dbType,
     });
     return data;
@@ -61,12 +60,13 @@ exports.getUploadPartUrl = async ({ backup, partNumber, hash, agentId, }) => {
     });
     return data;
 };
-exports.finishUpload = async ({ backup, partsEtag, hash, agentId, }) => {
+exports.finishUpload = async ({ backup, partsEtag, hash, agentId, publicKey, }) => {
     const { data } = await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
         status: 'DONE',
         partsEtag,
         hash,
         agentId,
+        publicKey,
     });
     return data;
 };

@@ -1,6 +1,6 @@
 {
   "name": "dbacked-agent",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Download and start the DBacked agent on your server",
   "main": "dist/index.js",
   "scripts": {

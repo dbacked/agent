@@ -21,7 +21,7 @@ export const startAgent = async (options: DBackedAgentOption) => {
   if (options.publicKey) {
     agentEnv.DBACKED_PUBLIC_KEY = options.publicKey;
   }
-  const agentArgs = ['--daemon', '--config-directory', agentDirectory];
+  const agentArgs = ['start-agent', '--daemon', '--config-directory', agentDirectory];
   if (options.daemonName) {
     agentArgs.push('--daemon-name');
     agentArgs.push(options.daemonName);

@@ -58,7 +58,11 @@ exports.backupDatabase = async (config, backupInfo) => {
         log_1.default.info('Informing server the upload is finished');
         hash.end();
         await dbackedApi_1.finishUpload({
-            backup, partsEtag, hash: hash.digest('base64'), agentId: config.agentId,
+            backup,
+            partsEtag,
+            hash: hash.read().toString('hex'),
+            agentId: config.agentId,
+            publicKey: config.publicKey,
         });
         log_1.default.info('backup finished !');
         process.exit(0);

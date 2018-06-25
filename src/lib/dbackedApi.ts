@@ -29,12 +29,11 @@ export const getProject = async () => {
 };
 
 export const createBackup = async ({
-  agentId, publicKey, dbType,
+  agentId, dbType,
 }) => {
   const { data } = await api.post('projects/own/backups', {
     agentId,
     agentVersion: VERSION.join('.'),
-    publicKey,
     dbType,
   });
   return data;
@@ -69,13 +68,14 @@ export const getUploadPartUrl = async ({
 };
 
 export const finishUpload = async ({
-  backup, partsEtag, hash, agentId,
+  backup, partsEtag, hash, agentId, publicKey,
 }) => {
   const { data } = await api.post(`projects/${backup.projectId}/backups/${backup.id}/status`, {
     status: 'DONE',
     partsEtag,
     hash,
     agentId,
+    publicKey,
   });
   return data;
 };

@@ -99,12 +99,12 @@ Description=DBacked agent
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/dbacked_agent
+ExecStart=/usr/local/bin/dbacked start-agent
 
 StandardInput=null
 StandardOutput=syslog
 StandardError=syslog
-SyslogIdentifier=DBacked
+SyslogIdentifier=dbacked
 Restart=always
 
 [Install]
@@ -124,7 +124,7 @@ export const installAgent = async (commandLine) => {
     process.exit(1);
   }
   const configDirectory = '/etc/dbacked';
-  await askAndCreateConfigFile(configDirectory, { interactive: !!commandLine.interactive });
+  await askAndCreateConfigFile(configDirectory, { interactive: !!commandLine.y });
 
   if (process.execPath !== '/usr/local/bin/dbacked_agent') {
     logger.info('Moving binary to /usr/local/bin/dbacked_agent');

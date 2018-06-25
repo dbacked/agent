@@ -62,7 +62,11 @@ export const backupDatabase = async (config, backupInfo) => {
     logger.info('Informing server the upload is finished');
     hash.end();
     await finishUpload({
-      backup, partsEtag, hash: hash.digest('base64'), agentId: config.agentId,
+      backup,
+      partsEtag,
+      hash: (<any>hash.read()).toString('hex'),
+      agentId: config.agentId,
+      publicKey: config.publicKey,
     });
     logger.info('backup finished !');
     process.exit(0);

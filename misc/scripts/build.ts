@@ -22,12 +22,12 @@ const rootDir = resolve(__dirname, '../../');
 async function main() {
   console.log('Compiling');
   await exec([
-    resolve(rootDir, 'package.json'), '--output', resolve(rootDir, 'dbacked_agent'),
+    resolve(rootDir, 'package.json'), '--output', resolve(rootDir, 'dbacked'),
     '--target', 'host',
   ]);
   console.log('Compiled');
-  const md5 = await getFileMd5(resolve(rootDir, 'dbacked_agent'));
-  await writeFilePromisified(resolve(rootDir, 'dbacked_agent_md5'), md5);
+  const md5 = await getFileMd5(resolve(rootDir, 'dbacked'));
+  await writeFilePromisified(resolve(rootDir, 'dbacked_md5'), md5);
   console.log('MD5 saved');
 }
 

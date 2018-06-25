@@ -13,12 +13,13 @@ const child_process_1 = require("child_process");
 const agentFile_1 = require("./agentFile");
 const execFilePromisified = util_1.promisify(child_process_1.execFile);
 exports.startAgent = (options) => __awaiter(this, void 0, void 0, function* () {
+    const agentDirectory = agentFile_1.getAgentDirectory();
     const agentPath = agentFile_1.getAgentPath();
     const agentEnv = Object.assign({ DBACKED_APIKEY: options.apikey, DBACKED_DB_TYPE: options.dbType, DBACKED_DB_HOST: options.db.host, DBACKED_DB_USERNAME: options.db.user, DBACKED_DB_PASSWORD: options.db.password, DBACKED_DB_NAME: options.db.database }, process.env);
     if (options.publicKey) {
         agentEnv.DBACKED_PUBLIC_KEY = options.publicKey;
     }
-    const agentArgs = ['--daemon'];
+    const agentArgs = ['start-agent', '--daemon', '--config-directory', agentDirectory];
     if (options.daemonName) {
         agentArgs.push('--daemon-name');
         agentArgs.push(options.daemonName);
