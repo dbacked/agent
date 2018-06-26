@@ -1,6 +1,6 @@
 # DBacked Agent
 
-This repo contains the agent needed to backup your PostgreSQL / MySQL database with the [DBacked service](https://dbacked.com). It's written in NodeJS and is compiled in a single binary for ease of use.
+This repo contains the agent needed to backup and restore your PostgreSQL / MySQL database with the [DBacked service](https://dbacked.com). It's written in NodeJS and is compiled in a single binary for ease of use.
 
 A DBacked account is required to use this tool.
 
@@ -8,9 +8,9 @@ DBacked is a simple, secure and reliable database backup as a service. It create
 
 Its source code is released here so that you can read through it, audit it and compile it yourself before installing it on your server. This is optionnal but useful if you want to be 100% sure of what you execute on your servers.
 
-The compiled version is hosted on S3: [https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent](https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent)
+The compiled version is hosted here: [https://dl.dbacked.com/dbacked](https://dl.dbacked.com/dbacked)
 
-You can use the `dbacked_agent --help` for more information about how to use it.
+You can use the `dbacked --help` for more information about how to use it.
 
 ## How to install it
 
@@ -30,11 +30,11 @@ Look at the [NodeJS integration README](integrations/nodejs) for more informatio
 
 You can install the binary on your server directly. It's useful if you want to separate the backup job from your backend servers. You can use this binary directly on your database server. You need to make sure the binary is executed automatically on server start.
 
-Download the latest binary from [https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent](https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent) ([MD5 here](https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent_md5)) and configure your server to start it on startup.
+Download the latest binary from [https://dl.dbacked.com/dbacked](https://dl.dbacked.com/dbacked) ([MD5 here](https://dl.dbacked.com/dbacked_md5)) and configure your server to start it on startup.
 
 ### Docker
 
-You can use the agent as a Docker container: `docker run -d geekuillaume/dbacked_agent dbacked_agent --apikey YOUR_API_KEY --db-type pg --db-host DB_HOST --db-username DB_USERNAME --db-password DB_PASSWORD --db-name DB_NAME`. You can also use `mysql` instead of `pg`.
+You can use the agent as a Docker container: `docker run -d geekuillaume/dbacked_agent dbacked_agent start-agent --apikey YOUR_API_KEY --db-type pg --db-host DB_HOST --db-username DB_USERNAME --db-password DB_PASSWORD --db-name DB_NAME`. You can also use `mysql` instead of `pg`.
 
 To test it first before daemonizing it, remove the `-d` arg in the command.
 
@@ -68,7 +68,7 @@ If you decide to not use the integration, here's the different flags available:
 - `--db-password <dbPassword>`      [REQUIRED] Database password (env variable: DBACKED_DB_PASSWORD)
 - `--db-name <dbName>`              [REQUIRED] Database name (env variable: DBACKED_DB_NAME)
 - `--public-key <publicKey>`        Public key linked to the project (env variable: DBACKED_PUBLIC_KEY)
-- `--config-directory <directory>`  Directory where the agent id and others files are stored, default $HOME/.dbacked
+- `--config-directory <directory>`  Directory where the agent id and others files are stored, default /etc/dbacked
 - `--daemon`                        Detach the process as a daemon, will check if another daemon is not already started
 - `--daemon-name <name>`            Allows multiple daemons to be started at the same time under different names
 - `-h`, `--help`                    output usage information

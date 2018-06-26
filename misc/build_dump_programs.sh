@@ -44,7 +44,7 @@ rm -rf tmp
 
 # Upload
 
-aws s3 cp postgres.zip s3://dbacked-dumpprograms --acl public-read
-aws s3 cp postgres_md5 s3://dbacked-dumpprograms --acl public-read
-aws s3 cp mysql.zip s3://dbacked-dumpprograms --acl public-read
-aws s3 cp mysql_md5 s3://dbacked-dumpprograms --acl public-read
+aws s3 cp postgres.zip s3://dl.dbacked.com --acl public-read
+aws s3 cp postgres_md5 s3://dl.dbacked.com --acl public-read
+aws s3 cp mysql.zip s3://dl.dbacked.com --acl public-read
+aws s3 cp mysql_md5 s3://dl.dbacked.com --acl public-read

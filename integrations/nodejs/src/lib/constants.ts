@@ -16,5 +16,5 @@ export interface DBackedAgentOption {
   }
 }
 
-export const AGENT_URL = 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent';
-export const AGENT_MD5_URL = 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/dbacked_agent_md5';
+export const AGENT_URL = 'https://dl.dbacked.com/dbacked';
+export const AGENT_MD5_URL = 'https://dl.dbacked.com/dbacked_md5';

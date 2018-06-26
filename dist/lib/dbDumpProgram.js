@@ -13,8 +13,8 @@ const needToDownloadDumpProgram = async (type, dumpProgramDirectory) => {
     await mkdirpPromisifed(dumpProgramDirectory);
     const existingMd5 = await fs_1.computeFolderContentMd5(dumpProgramDirectory);
     const remoteMd5Url = {
-        mysql: 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/mysql_md5',
-        pg: 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/postgres_md5',
+        mysql: 'https://dl.dbacked.com/mysql_md5',
+        pg: 'https://dl.dbacked.com/postgres_md5',
     }[type];
     log_1.default.debug('Got dump programs MD5', { md5: existingMd5 });
     log_1.default.debug('Getting remote dump programs MD5');
@@ -28,8 +28,8 @@ exports.checkDbDumpProgram = async (type, directory) => {
     if (await needToDownloadDumpProgram(type, dumpProgramDirectory)) {
         log_1.default.debug('Downloading dump programs', { path: dumpProgramDirectory });
         const fileUrl = {
-            mysql: 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/mysql.zip',
-            pg: 'https://s3.eu-central-1.amazonaws.com/dbacked-dumpprograms/postgres.zip',
+            mysql: 'https://dl.dbacked.com/mysql.zip',
+            pg: 'https://dl.dbacked.com/postgres.zip',
         }[type];
         log_1.default.info('Downloading db dump program at url', { url: fileUrl });
         const response = await axios_1.default.get(fileUrl, {
