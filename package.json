@@ -1,6 +1,6 @@
 {
   "name": "dbacked",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "",
   "main": "src/index.js",
   "scripts": {
@@ -11,6 +11,7 @@
     "start:nobuild": "ts-node src/index.ts",
     "start:build": "tsc && node dist/index.js"
   },
+  "bin": "dist/index.js",
   "pkg": {
     "scripts": "dist/**/*.js"
   },
