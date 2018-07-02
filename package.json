@@ -1,5 +1,5 @@
 {
-  "name": "dbacked-agent",
+  "name": "dbacked",
   "version": "0.2.1",
   "description": "",
   "main": "src/index.js",
@@ -11,7 +11,6 @@
     "start:nobuild": "ts-node src/index.ts",
     "start:build": "tsc && node dist/index.js"
   },
-  "bin": "dist/index.js",
   "pkg": {
     "scripts": "dist/**/*.js"
   },
