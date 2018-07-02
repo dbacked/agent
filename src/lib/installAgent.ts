@@ -1,7 +1,6 @@
 import { promisify } from 'util';
 import { writeFile, readFile, copyFile } from 'fs';
 import * as mkdirp from 'mkdirp';
-import { prompt } from 'inquirer';
 import { resolve } from 'path';
 import * as isRoot from 'is-root';
 import { exec } from 'child_process';
@@ -82,15 +81,15 @@ export const installAgent = async (commandLine) => {
   const config = await getConfig(commandLine);
   await askAndCreateConfigFile(config, { interactive: !commandLine.y });
 
-  if (process.execPath !== '/usr/local/bin/dbacked_agent') {
-    logger.info('Moving binary to /usr/local/bin/dbacked_agent');
-    copyFilePromisified(process.execPath, '/usr/local/bin/dbacked_agent');
+  if (process.execPath !== '/usr/local/bin/dbacked') {
+    logger.info('Moving binary to /usr/local/bin/dbacked');
+    copyFilePromisified(process.execPath, '/usr/local/bin/dbacked');
   }
   if ((await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n') {
     await installSystemdService();
   } else {
     console.log('This install program only supports systemd and you are using another init system');
-    console.log('Make sure /usr/local/bin/dbacked_agent is launched at startup');
+    console.log('Make sure /usr/local/bin/dbacked is launched at startup');
   }
 };
 
