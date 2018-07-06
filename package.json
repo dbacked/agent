@@ -1,6 +1,6 @@
 {
   "name": "dbacked",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "",
   "main": "src/index.js",
   "scripts": {
@@ -40,7 +40,7 @@
     "proper-lockfile": "^3.0.2",
     "randomstring": "^1.1.5",
     "unzip-stream": "^0.3.0",
-    "winston": "^3.0.0-rc3",
+    "winston": "^3.0.0",
     "yargs": "^11.0.0"
   },
   "devDependencies": {
