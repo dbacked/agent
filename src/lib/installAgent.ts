@@ -70,7 +70,7 @@ WantedBy=multi-user.target
   logger.info('Activating service');
   await execPromisified('systemctl daemon-reload');
   await execPromisified('systemctl enable --now dbacked.service');
-  logger.info('Service installed and stated');
+  logger.info('Service installed and started');
 };
 
 export const installAgent = async (commandLine) => {
