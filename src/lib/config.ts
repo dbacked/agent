@@ -173,7 +173,7 @@ export const askForConfig = async (config) => {
       validate: requiredResponse,
     }, {
       name: 'dbPassword',
-      message: 'DB password: [OPTIONNAL]',
+      message: 'DB password: [OPTIONAL]',
       default: config.dbPassword,
     }, {
       name: 'dbName',
@@ -183,7 +183,7 @@ export const askForConfig = async (config) => {
     }, {
       name: 'agentId',
       default: config.agentId,
-      message: 'Server name [OPTIONNAL]',
+      message: 'Server name [OPTIONAL]',
     },
   ]);
 };
