@@ -1,15 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("axios");
-const promise_readable_1 = require("promise-readable");
 const crypto_1 = require("crypto");
 const log_1 = require("./log");
 const delay_1 = require("./delay");
+const streamToPromise_1 = require("./streamToPromise");
 // import { Stream, Readable } from 'stream';
 // import { delay } from './delay';
 const uploadChunkToS3 = async ({ url, chunk, hash }, retryCount = 0) => {
     try {
         const res = await axios_1.default({
+            maxContentLength: Infinity,
             method: 'PUT',
             url,
             data: chunk,
@@ -27,7 +28,7 @@ const uploadChunkToS3 = async ({ url, chunk, hash }, retryCount = 0) => {
         if (retryCount >= 2) { // already tried 3 times, giving up
             throw e;
         }
-        log_1.default.warn('Error while uploading chunk to S3, waiting 10 seconds before trying again', { e });
+        log_1.default.warn('Error while uploading chunk to S3, waiting 10 seconds before trying again', { e: e.message });
         await delay_1.delay(10 * 1000);
         return uploadChunkToS3({ url, chunk, hash }, retryCount + 1);
     }
@@ -50,21 +51,25 @@ const getChunkSize = (partCount) => {
 };
 exports.uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
     log_1.default.info('Starting backup upload');
-    const promisifedStream = new promise_readable_1.PromiseReadable(fileStream);
+    const promisifedStream = new streamToPromise_1.default(fileStream);
     const partsEtag = [];
     while (true) {
-        log_1.default.debug('Waiting for chunk', { partCount: partsEtag.length });
-        const chunk = await promisifedStream.read(getChunkSize(partsEtag.length));
-        if (!chunk) {
+        const chunkSize = getChunkSize(partsEtag.length);
+        promisifedStream.setSize(chunkSize);
+        log_1.default.debug('Waiting for chunk', { partCount: partsEtag.length, size: chunkSize });
+        const { done, value: chunk } = await promisifedStream.next();
+        log_1.default.debug('Got chunk', { partCount: partsEtag.length });
+        if (!chunk || done) {
             break;
         }
         const hash = crypto_1.createHash('md5').update(chunk).digest('base64');
-        log_1.default.debug('Starting uploading chunk', { partCount: partsEtag.length, size: chunk.length });
         const url = await generateBackupUrl({ partNumber: partsEtag.length + 1, partHash: hash });
+        log_1.default.debug('Starting uploading chunk', { partCount: partsEtag.length, size: chunk.length });
         const chunkEtag = await uploadChunkToS3({ url, chunk, hash });
         log_1.default.debug('Uploaded chunk', { partCount: partsEtag.length });
         partsEtag.push(chunkEtag);
     }
+    log_1.default.debug('Finished uploading chunks');
     return partsEtag;
 };
 //# sourceMappingURL=s3.js.map

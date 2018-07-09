@@ -1,15 +1,16 @@
 import Axios from 'axios';
-import { PromiseReadable } from 'promise-readable';
 import { createHash } from 'crypto';
 
 import logger from './log';
 import { delay } from './delay';
+import PromisifiedReadableStream from './streamToPromise';
 // import { Stream, Readable } from 'stream';
 // import { delay } from './delay';
 
 const uploadChunkToS3 = async ({ url, chunk, hash }, retryCount = 0) => {
   try {
     const res = await Axios({
+      maxContentLength: Infinity,
       method: 'PUT',
       url,
       data: chunk,
@@ -26,7 +27,7 @@ const uploadChunkToS3 = async ({ url, chunk, hash }, retryCount = 0) => {
     if (retryCount >= 2) { // already tried 3 times, giving up
       throw e;
     }
-    logger.warn('Error while uploading chunk to S3, waiting 10 seconds before trying again', { e });
+    logger.warn('Error while uploading chunk to S3, waiting 10 seconds before trying again', { e: e.message });
     await delay(10 * 1000);
     return uploadChunkToS3({ url, chunk, hash }, retryCount + 1);
   }
@@ -51,20 +52,24 @@ const getChunkSize = (partCount) => {
 
 export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
   logger.info('Starting backup upload');
-  const promisifedStream = new PromiseReadable(fileStream);
+  const promisifedStream = new PromisifiedReadableStream(fileStream);
   const partsEtag = [];
   while (true) {
-    logger.debug('Waiting for chunk', { partCount: partsEtag.length });
-    const chunk = await promisifedStream.read(getChunkSize(partsEtag.length));
-    if (!chunk) {
+    const chunkSize = getChunkSize(partsEtag.length);
+    promisifedStream.setSize(chunkSize);
+    logger.debug('Waiting for chunk', { partCount: partsEtag.length, size: chunkSize });
+    const { done, value: chunk } = await promisifedStream.next();
+    logger.debug('Got chunk', { partCount: partsEtag.length });
+    if (!chunk || done) {
       break;
     }
     const hash = createHash('md5').update(chunk).digest('base64');
-    logger.debug('Starting uploading chunk', { partCount: partsEtag.length, size: chunk.length });
     const url = await generateBackupUrl({ partNumber: partsEtag.length + 1, partHash: hash });
+    logger.debug('Starting uploading chunk', { partCount: partsEtag.length, size: chunk.length });
     const chunkEtag = await uploadChunkToS3({ url, chunk, hash });
     logger.debug('Uploaded chunk', { partCount: partsEtag.length });
     partsEtag.push(chunkEtag);
   }
+  logger.debug('Finished uploading chunks');
   return partsEtag;
 };

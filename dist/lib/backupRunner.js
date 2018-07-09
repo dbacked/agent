@@ -42,9 +42,11 @@ exports.backupDatabase = async (config, backupInfo) => {
             backupStream,
         ]);
         // Need a passthrough because else the stream is just consumed by the hash
-        const uploadingStream = new stream_1.PassThrough();
-        backupFileStream.pipe(hash);
+        const uploadingStream = new stream_1.PassThrough({
+            highWaterMark: 201 * 1024 * 1024,
+        });
         backupFileStream.pipe(uploadingStream);
+        backupFileStream.pipe(hash);
         const partsEtag = await s3_1.uploadToS3({
             fileStream: uploadingStream,
             generateBackupUrl: async ({ partNumber, partHash }) => {

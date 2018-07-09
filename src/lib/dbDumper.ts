@@ -47,6 +47,10 @@ export const startDumper = async (backupKey, config: Config) => {
   );
   logger.debug('Started dump process');
 
+  dumpProcess.on('close', (code) => {
+    logger.debug('Dumper closed', { code });
+  });
+
   await waitForProcessStart(dumpProcess);
   logger.debug('Dump process started');
   const gzip = createGzip();

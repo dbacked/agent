@@ -41,6 +41,9 @@ exports.startDumper = async (backupKey, config) => {
         },
     });
     log_1.default.debug('Started dump process');
+    dumpProcess.on('close', (code) => {
+        log_1.default.debug('Dumper closed', { code });
+    });
     await waitForProcessStart_1.waitForProcessStart(dumpProcess);
     log_1.default.debug('Dump process started');
     const gzip = zlib_1.createGzip();

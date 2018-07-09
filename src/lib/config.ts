@@ -137,7 +137,7 @@ export const getAndCheckConfig = async (commandLine) => {
     assertExit(field && field.length, `${arg}, ${env} env variable or ${confName} config field required`);
   });
   if (!config.publicKey) {
-    logger.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY or publicKey config key, this could expose you to a man in the middle attack on your backups');
+    logger.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY or publicKey config key, your public key will be downloaded from the DBacked server, this could expose you to a man in the middle attack on your backups');
   }
   return config;
 };
