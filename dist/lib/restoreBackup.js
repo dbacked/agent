@@ -4,6 +4,7 @@ const inquirer_1 = require("inquirer");
 const luxon_1 = require("luxon");
 const axios_1 = require("axios");
 const promise_readable_1 = require("promise-readable");
+const node_forge_1 = require("node-forge");
 const config_1 = require("./config");
 const dbackedApi_1 = require("./dbackedApi");
 const log_1 = require("./log");
@@ -53,7 +54,7 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
     let privateKey;
     if (commandLine.privateKeyPath) {
         try {
-            privateKey = await fs_1.readFilePromisified(commandLine.privateKeyPath);
+            privateKey = await fs_1.readFilePromisified(commandLine.privateKeyPath, { encoding: 'utf-8' });
         }
         catch (e) {
             assertExit_1.default(false, `Couldn't read private key: ${e}`);
@@ -63,7 +64,23 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
         privateKey = process.env.DBACKED_PRIVATE_KEY;
     }
     else {
-        assertExit_1.default(false, 'Non interactive mode but no private key was provided by --private-key-path or DBACKED_PRIVATE_KEY env');
+        assertExit_1.default(false, 'No private key was provided by --private-key-path or DBACKED_PRIVATE_KEY env');
+    }
+    if (privateKey.split('\n')[1] === 'Proc-Type: 4,ENCRYPTED') {
+        const { passphrase } = await inquirer_1.prompt([{
+                type: 'input',
+                name: 'passphrase',
+                message: 'Private key passphrase',
+            }]);
+        try {
+            const decryptedPrivateKey = node_forge_1.pki.decryptRsaPrivateKey(privateKey, passphrase);
+            assertExit_1.default(decryptedPrivateKey, 'Invalid passphrase');
+            privateKey = node_forge_1.pki.privateKeyToPem(decryptedPrivateKey);
+        }
+        catch (e) {
+            console.error('Corrupted private key or invalid passphrase, try decrypting the key with openssl cli', e);
+            process.exit(1);
+        }
     }
     try {
         return crypto_1.privateDecrypt(privateKey, encryptedAesKey);

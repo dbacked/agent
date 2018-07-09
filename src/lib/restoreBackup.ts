@@ -2,6 +2,7 @@ import { prompt } from 'inquirer';
 import { DateTime } from 'luxon';
 import Axios from 'axios';
 import { PromiseReadable } from 'promise-readable';
+import { pki } from 'node-forge';
 
 import { getConfig, askForConfig } from './config';
 import { getProject, registerApiKey, getBackupDownloadUrl } from './dbackedApi';
@@ -55,15 +56,31 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
   let privateKey;
   if (commandLine.privateKeyPath) {
     try {
-      privateKey = await readFilePromisified(commandLine.privateKeyPath);
+      privateKey = await readFilePromisified(commandLine.privateKeyPath, { encoding: 'utf-8' });
     } catch (e) {
       assertExit(false, `Couldn't read private key: ${e}`);
     }
   } else if (process.env.DBACKED_PRIVATE_KEY) {
     privateKey = process.env.DBACKED_PRIVATE_KEY;
   } else {
-    assertExit(false, 'Non interactive mode but no private key was provided by --private-key-path or DBACKED_PRIVATE_KEY env');
+    assertExit(false, 'No private key was provided by --private-key-path or DBACKED_PRIVATE_KEY env');
   }
+  if (privateKey.split('\n')[1] === 'Proc-Type: 4,ENCRYPTED') {
+    const { passphrase } = <any> await prompt([{
+      type: 'input',
+      name: 'passphrase',
+      message: 'Private key passphrase',
+    }]);
+    try {
+      const decryptedPrivateKey = pki.decryptRsaPrivateKey(privateKey, passphrase);
+      assertExit(decryptedPrivateKey, 'Invalid passphrase');
+      privateKey = pki.privateKeyToPem(decryptedPrivateKey);
+    } catch (e) {
+      console.error('Corrupted private key or invalid passphrase, try decrypting the key with openssl cli', e);
+      process.exit(1);
+    }
+  }
+
   try {
     return privateDecrypt(privateKey, encryptedAesKey);
   } catch (e) {
