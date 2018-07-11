@@ -27,10 +27,11 @@ exports.startDatabaseBackupJob = (config, backupInfo) => {
                 const { type, payload } = JSON.parse(message);
                 if (type === 'error') {
                     errorMessageReceived = true;
-                    reject(new Error(payload));
+                    reject(payload);
                 }
             }
             catch (e) { }
+            ; // eslint-disable-line
         });
         runner.on('exit', (code) => {
             if (code === 0) {
@@ -77,11 +78,13 @@ exports.agentLoop = async (commandLineArgs) => {
         }
         catch (e) {
             log_1.default.error('Error while backuping', { e });
-            await dbackedApi_1.reportError({
-                backup: backupInfo.backup,
-                e,
-                agentId: config.agentId,
-            });
+            if (backupInfo) {
+                await dbackedApi_1.reportError({
+                    backup: backupInfo.backup,
+                    e,
+                    agentId: config.agentId,
+                });
+            }
             await delay_1.delay(60 * 60 * 1000); // Delay for an hour if got an error
         }
     }

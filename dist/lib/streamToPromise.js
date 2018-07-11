@@ -54,6 +54,11 @@ class PromisifiedReadableStream {
             }
         }
         else if (this._state === exports.states.ended) {
+            if (this._lastReaded) {
+                const returnObj = { done: false, value: this._lastReaded };
+                this._lastReaded = null;
+                return returnObj;
+            }
             return { done: true, value: null };
         }
         else if (this._state === exports.states.errored) {
@@ -67,6 +72,7 @@ class PromisifiedReadableStream {
             }
             // we're no longer readable, need to find out what state we're in
             this._state = exports.states.notReadable;
+            this._lastReaded = null;
             return this.next();
         }
     }
@@ -80,9 +86,10 @@ class PromisifiedReadableStream {
         let eventListener = null;
         const promise = new Promise((resolve, reject) => {
             eventListener = () => {
-                if (this._stream.readableLength < this._size) {
+                if (this._stream.readableLength < this._size && this._state !== exports.states.ended) {
                     // To force returning null and refire readable event
-                    this._stream.read(this._size);
+                    const readed = this._stream.read(this._size);
+                    this._lastReaded = readed;
                     this._state = exports.states.notReadable;
                     return;
                 }
@@ -121,7 +128,7 @@ class PromisifiedReadableStream {
             this._rejections.add(reject);
         });
         const cleanup = () => {
-            if (eventListener == null)
+            if (eventListener === null)
                 return;
             this._stream.removeListener('end', eventListener);
         };

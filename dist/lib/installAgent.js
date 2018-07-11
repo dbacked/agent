@@ -47,6 +47,13 @@ const askAndCreateConfigFile = async (sourceConfig, { interactive }) => {
     await saveConfig(config.configDirectory, config);
     return config;
 };
+const stopPreviousSystemdService = async () => {
+    try {
+        await execPromisified('systemctl stop dbacked.service');
+    }
+    catch (e) { }
+    ; // eslint-disable-line
+};
 const installSystemdService = async () => {
     const service = `
 [Unit]
@@ -79,11 +86,15 @@ exports.installAgent = async (commandLine) => {
     }
     const config = await config_1.getConfig(commandLine);
     await askAndCreateConfigFile(config, { interactive: !commandLine.y });
+    const isSystemd = (await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n';
+    if (isSystemd) {
+        await stopPreviousSystemdService();
+    }
     if (process.execPath !== '/usr/local/bin/dbacked') {
         log_1.default.info('Moving binary to /usr/local/bin/dbacked');
         copyFilePromisified(process.execPath, '/usr/local/bin/dbacked');
     }
-    if ((await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n') {
+    if (isSystemd) {
         await installSystemdService();
     }
     else {

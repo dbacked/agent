@@ -42,7 +42,7 @@ exports.waitForBackup = async (config) => {
         }
         catch (e) {
             if (e.response && e.response.data && e.response.data.message === 'No backup needed for the moment') {
-                log_1.default.info('No backup needed, waiting 5 minutes');
+                log_1.default.info('No backup needed, waiting 5 minutes', { details: e.response.data.details });
             }
             else {
                 throw e;
