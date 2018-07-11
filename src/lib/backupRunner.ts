@@ -30,20 +30,16 @@ export const backupDatabase = async (config, backupInfo) => {
     const { key: backupKey, encryptedKey } = await createBackupKey(config.publicKey);
     const { backupStream, iv } = await startDumper(backupKey, config);
 
-    const magicStream = createReadStream(Buffer.from('DBACKED'));
-    const versionStream = createReadStream(Buffer.from([...VERSION]));
-    const encryptedKeyLengthStream = createReadStream(Buffer.from(<ArrayBuffer>(new Uint32Array([encryptedKey.length])).buffer));
-    const encryptedKeyStream = createReadStream(encryptedKey);
-    const ivStream = createReadStream(iv);
-    logger.debug('Creating multistream');
-    const backupFileStream = MultiStream([
-      magicStream,
-      versionStream,
-      encryptedKeyLengthStream,
-      encryptedKeyStream,
-      ivStream,
-      backupStream,
-    ]);
+    logger.debug('Creating backup file stream PassThrough');
+    const backupFileStream = new PassThrough({
+      highWaterMark: 201 * 1024 * 1024, // this is the max chunk size + 1MB
+    });
+    backupFileStream.write(Buffer.from('DBACKED'));
+    backupFileStream.write(Buffer.from([...VERSION]));
+    backupFileStream.write(Buffer.from(<ArrayBuffer>(new Uint32Array([encryptedKey.length])).buffer));
+    backupFileStream.write(encryptedKey);
+    backupFileStream.write(iv);
+    backupStream.pipe(backupFileStream);
     // Need a passthrough because else the stream is just consumed by the hash
     const uploadingStream = new PassThrough({
       highWaterMark: 201 * 1024 * 1024, // this is the max chunk size + 1MB
@@ -76,7 +72,7 @@ export const backupDatabase = async (config, backupInfo) => {
     logger.error('Unknown error while creating backup', { error: e.code || (e.response && e.response.data) || e.message });
     process.send(JSON.stringify({
       type: 'error',
-      payload: `${e.code || (e.response && e.response.data) || e.message}\n${e.stack}`,
+      payload: `${JSON.stringify(e.code || (e.response && e.response.data) || e.message)}\n${e.stack}`,
     }));
   }
 };

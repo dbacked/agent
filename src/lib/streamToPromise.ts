@@ -46,6 +46,7 @@ export default class PromisifiedReadableStream {
     _state: Symbol;
     _rejections: Set<Reject>;
     _size: number;
+    _lastReaded?: any;
 
     setSize(size: number) {
       this._size = size;
@@ -71,18 +72,23 @@ export default class PromisifiedReadableStream {
           end.cleanup();
         }
       } else if (this._state === states.ended) {
+        if (this._lastReaded) {
+          const returnObj = { done: false, value: this._lastReaded };
+          this._lastReaded = null;
+          return returnObj;
+        }
         return { done: true, value: null };
       } else if (this._state === states.errored) {
         throw this._error;
       } else /* readable */ {
         // stream.read returns null if not readable or when stream has ended
-
         const data = this._stream.read(this._size);
         if (data !== null) {
           return { done: false, value: data };
         }
         // we're no longer readable, need to find out what state we're in
         this._state = states.notReadable;
+        this._lastReaded = null;
         return this.next();
       }
     }
@@ -98,9 +104,10 @@ export default class PromisifiedReadableStream {
 
       const promise = new Promise((resolve, reject) => {
         eventListener = () => {
-          if (this._stream.readableLength < this._size) {
+          if (this._stream.readableLength < this._size && this._state !== states.ended) {
             // To force returning null and refire readable event
-            this._stream.read(this._size);
+            const readed = this._stream.read(this._size);
+            this._lastReaded = readed;
             this._state = states.notReadable;
             return;
           }
@@ -147,7 +154,7 @@ export default class PromisifiedReadableStream {
       });
 
       const cleanup = () => {
-        if (eventListener == null) return;
+        if (eventListener === null) return;
         this._stream.removeListener('end', eventListener);
       };
 
