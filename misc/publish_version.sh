@@ -15,3 +15,4 @@ docker push geekuillaume/dbacked:latest
 docker push geekuillaume/dbacked:$PACKAGE_VERSION
 aws s3 cp dbacked s3://dl.dbacked.com --acl public-read
 aws s3 cp dbacked_md5 s3://dl.dbacked.com --acl public-read
+aws cloudfront create-invalidation --distribution-id EL5YBKNBM3EXK --path /dbacked /dbacked_md5
