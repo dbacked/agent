@@ -47,6 +47,12 @@ const askAndCreateConfigFile = async (sourceConfig, { interactive }) => {
   return config;
 };
 
+const stopPreviousSystemdService = async () => {
+  try {
+    await execPromisified('systemctl stop dbacked.service');
+  } catch (e) {}; // eslint-disable-line
+};
+
 const installSystemdService = async () => {
   const service = `
 [Unit]
@@ -80,12 +86,15 @@ export const installAgent = async (commandLine) => {
   }
   const config = await getConfig(commandLine);
   await askAndCreateConfigFile(config, { interactive: !commandLine.y });
-
+  const isSystemd = (await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n';
+  if (isSystemd) {
+    await stopPreviousSystemdService();
+  }
   if (process.execPath !== '/usr/local/bin/dbacked') {
     logger.info('Moving binary to /usr/local/bin/dbacked');
     copyFilePromisified(process.execPath, '/usr/local/bin/dbacked');
   }
-  if ((await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n') {
+  if (isSystemd) {
     await installSystemdService();
   } else {
     console.log('This install program only supports systemd and you are using another init system');
