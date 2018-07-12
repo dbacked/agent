@@ -1,7 +1,6 @@
 import { prompt } from 'inquirer';
 import { DateTime } from 'luxon';
 import Axios from 'axios';
-import { PromiseReadable } from 'promise-readable';
 import { pki } from 'node-forge';
 
 import { getConfig, askForConfig } from './config';
@@ -14,6 +13,7 @@ import { privateDecrypt, createDecipheriv } from 'crypto';
 import { createGunzip } from 'zlib';
 import { checkDbDumpProgram } from './dbDumpProgram';
 import { restoreDb } from './dbRestoreProgram';
+import PromisifiedReadableStream from './streamToPromise';
 
 const getBackupToRestore = async (config, { useLastBackup }) => {
   registerApiKey(config.apikey);
@@ -99,18 +99,23 @@ export const restoreBackup = async (commandLine) => {
     useLastBackup: commandLine.lastBackup,
     useStdin: commandLine.rawInput,
   });
-  const promisifiedBackupStream = new PromiseReadable(backupStream);
-  assertExit((await promisifiedBackupStream.read(7)).toString() === 'DBACKED', 'Invalid start of file, check for file corruption');
-  const version = [...(await promisifiedBackupStream.read(3))]; // eslint-disable-line
-  const aesKeyLengthBuffer = <Buffer>(await promisifiedBackupStream.read(4));
+  const promisifiedBackupStream = new PromisifiedReadableStream(backupStream);
+  promisifiedBackupStream.setSize(7);
+  assertExit((await promisifiedBackupStream.next()).value.toString() === 'DBACKED', 'Invalid start of file, check for file corruption');
+  promisifiedBackupStream.setSize(3);
+  const version = [...(await promisifiedBackupStream.next()).value]; // eslint-disable-line
+  promisifiedBackupStream.setSize(4);
+  const aesKeyLengthBuffer = <Buffer>(await promisifiedBackupStream.next()).value;
   const [aesKeyLength] = new Uint32Array(aesKeyLengthBuffer.buffer.slice(
     aesKeyLengthBuffer.byteOffset,
     aesKeyLengthBuffer.byteOffset + 4,
   ));
-  const encryptedAesKey = <Buffer> await promisifiedBackupStream.read(aesKeyLength);
+  promisifiedBackupStream.setSize(aesKeyLength);
+  const encryptedAesKey = <Buffer> (await promisifiedBackupStream.next()).value;
   assertExit(encryptedAesKey && encryptedAesKey.length === aesKeyLength, 'File ends before reading aes key, no aes key header, is file truncated?');
   const decryptedAesKey = await decryptAesKey(commandLine, encryptedAesKey);
-  const iv = <Buffer> await promisifiedBackupStream.read(16);
+  promisifiedBackupStream.setSize(16);
+  const iv = <Buffer> (await promisifiedBackupStream.next()).value;
   assertExit(iv && iv.length === 16, 'No IV header, is file truncated?');
   const decipher = createDecipheriv('aes256', decryptedAesKey, iv);
   backupStream.pipe(decipher);

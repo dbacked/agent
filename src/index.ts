@@ -12,11 +12,12 @@ import { restoreBackup } from './lib/restoreBackup';
 
 yargs
   .option('apikey', { string: true, describe: 'DBacked API key (can also be provided with the DBACKED_APIKEY env variable)' })
-  .option('db-type', { string: true, desc: 'Database type (pg or mysql) (env variable: DBACKED_DB_TYPE)' })
+  .option('db-type', { string: true, desc: 'Database type (pg or mysql or mongodb) (env variable: DBACKED_DB_TYPE)' })
   .option('db-host', { string: true, desc: 'Database host (env variable: DBACKED_DB_HOST)' })
   .option('db-username', { string: true, desc: 'Database username (env variable: DBACKED_DB_USERNAME)' })
   .option('db-password', { string: true, desc: 'Database password (env variable: DBACKED_DB_PASSWORD)' })
   .option('db-name', { string: true, desc: 'Database name (env variable: DBACKED_DB_NAME)' })
+  .option('authentication-database', { string: true, desc: 'MongoDB only: Specifies the database in which the user is created (env variable: DBACKED_AUTHENTICATION_DATABASE)' })
   .option('config-directory', { string: true, desc: 'Directory where the agent id and others files are stored, default /etc/dbacked' })
   .option('public-key', { string: true, desc: 'Public key linked to the project (env variable: DBACKED_PUBLIC_KEY)' })
   .command(

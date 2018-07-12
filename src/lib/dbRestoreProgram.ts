@@ -1,30 +1,52 @@
 import { spawn } from 'child_process';
 import { resolve } from 'path';
-import { promisify } from 'util';
 
-import logger from './log';
 import { Config } from './config';
-import { waitForProcessStart } from './waitForProcessStart';
 
 export const restoreDb = async (stream, config: Config) => {
-  let args;
-  if (config.dbType === 'pg') {
-    args = [
-      '-U', config.dbUsername, '-h', config.dbHost,
-      '-d', config.dbName,
-    ];
-    if (!config.dbPassword) {
-      args.push('--no-password');
-    }
-  } else if (config.dbType === 'mysql') {
-    args = [
-      '-u', config.dbUsername, '-h', config.dbHost,
-    ];
-    if (config.dbPassword) {
-      args.push(`--password=${config.dbPassword}`);
-    }
-    args.push(config.dbName);
-  }
+  const args = {
+    pg: () => {
+      const pgArgs = [
+        '-U', config.dbUsername, '-h', config.dbHost,
+        '-d', config.dbName,
+      ];
+      if (!config.dbPassword) {
+        pgArgs.push('--no-password');
+      }
+      return pgArgs;
+    },
+    mysql: () => {
+      const mysqlArgs = [
+        '-u', config.dbUsername, '-h', config.dbHost,
+      ];
+      if (config.dbPassword) {
+        mysqlArgs.push(`--password=${config.dbPassword}`);
+      }
+      mysqlArgs.push(config.dbName);
+      return mysqlArgs;
+    },
+    mongodb: () => {
+      const mongodbArgs = [
+        '--host', config.dbHost,
+        '--archive',
+      ];
+      if (config.dbName) {
+        mongodbArgs.push('--db');
+        mongodbArgs.push(config.dbName);
+      }
+      if (config.dbPassword) {
+        mongodbArgs.push('--username');
+        mongodbArgs.push(config.dbUsername);
+        mongodbArgs.push('--password');
+        mongodbArgs.push(config.dbPassword);
+        mongodbArgs.push('--authenticationDatabase');
+        mongodbArgs.push(config.authenticationDatabase);
+      }
+      return mongodbArgs;
+    },
+  }[config.dbType]();
+
+
   const restoreProcess = await spawn(
     resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`, 'restore'),
     args,

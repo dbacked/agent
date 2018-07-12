@@ -3,25 +3,47 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const child_process_1 = require("child_process");
 const path_1 = require("path");
 exports.restoreDb = async (stream, config) => {
-    let args;
-    if (config.dbType === 'pg') {
-        args = [
-            '-U', config.dbUsername, '-h', config.dbHost,
-            '-d', config.dbName,
-        ];
-        if (!config.dbPassword) {
-            args.push('--no-password');
-        }
-    }
-    else if (config.dbType === 'mysql') {
-        args = [
-            '-u', config.dbUsername, '-h', config.dbHost,
-        ];
-        if (config.dbPassword) {
-            args.push(`--password=${config.dbPassword}`);
-        }
-        args.push(config.dbName);
-    }
+    const args = {
+        pg: () => {
+            const pgArgs = [
+                '-U', config.dbUsername, '-h', config.dbHost,
+                '-d', config.dbName,
+            ];
+            if (!config.dbPassword) {
+                pgArgs.push('--no-password');
+            }
+            return pgArgs;
+        },
+        mysql: () => {
+            const mysqlArgs = [
+                '-u', config.dbUsername, '-h', config.dbHost,
+            ];
+            if (config.dbPassword) {
+                mysqlArgs.push(`--password=${config.dbPassword}`);
+            }
+            mysqlArgs.push(config.dbName);
+            return mysqlArgs;
+        },
+        mongodb: () => {
+            const mongodbArgs = [
+                '--host', config.dbHost,
+                '--archive',
+            ];
+            if (config.dbName) {
+                mongodbArgs.push('--db');
+                mongodbArgs.push(config.dbName);
+            }
+            if (config.dbPassword) {
+                mongodbArgs.push('--username');
+                mongodbArgs.push(config.dbUsername);
+                mongodbArgs.push('--password');
+                mongodbArgs.push(config.dbPassword);
+                mongodbArgs.push('--authenticationDatabase');
+                mongodbArgs.push(config.authenticationDatabase);
+            }
+            return mongodbArgs;
+        },
+    }[config.dbType]();
     const restoreProcess = await child_process_1.spawn(path_1.resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`, 'restore'), args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {

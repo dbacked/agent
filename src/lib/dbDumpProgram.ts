@@ -17,6 +17,7 @@ const needToDownloadDumpProgram = async (type, dumpProgramDirectory) => {
   const remoteMd5Url = {
     mysql: 'https://dl.dbacked.com/mysql_md5',
     pg: 'https://dl.dbacked.com/postgres_md5',
+    mongodb: 'https://dl.dbacked.com/mongodb_md5',
   }[type];
   logger.debug('Got dump programs MD5', { md5: existingMd5 });
   logger.debug('Getting remote dump programs MD5');
@@ -33,6 +34,7 @@ export const checkDbDumpProgram = async (type: DB_TYPE, directory) => {
     const fileUrl = {
       mysql: 'https://dl.dbacked.com/mysql.zip',
       pg: 'https://dl.dbacked.com/postgres.zip',
+      mongodb: 'https://dl.dbacked.com/mongodb.zip',
     }[type];
     logger.info('Downloading db dump program at url', { url: fileUrl });
     const response = await Axios.get(fileUrl, {

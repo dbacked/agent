@@ -9,7 +9,7 @@ exports.waitForProcessStart = (childProcess) => {
         childProcess.stderr.addListener('data', (data) => { processStderr += data; });
         log_1.default.debug('Listening on dump process close event');
         childProcess.addListener('close', (code) => {
-            log_1.default.debug('Child process close event fired', { code });
+            log_1.default.debug('Child process close event fired', { code, processStderr });
             if (code !== 0) {
                 reject(new error_1.DbError(processStderr));
             }
@@ -20,6 +20,8 @@ exports.waitForProcessStart = (childProcess) => {
             if (childProcess.stdout.readableLength) {
                 log_1.default.debug('Child process readableLength is > 0', { readableLength: childProcess.stdout.readableLength });
                 childProcess.stdout.removeListener('readable', waitForReadable);
+                const readed = childProcess.stdout.read();
+                childProcess.stdout.unshift(readed);
                 resolve();
             }
         };

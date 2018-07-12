@@ -12,6 +12,7 @@ import { getProject, registerApiKey } from './dbackedApi';
 export enum DB_TYPE {
   pg = 'pg',
   mysql = 'mysql',
+  mongodb = 'mongodb',
 }
 
 export interface Config {
@@ -20,11 +21,12 @@ export interface Config {
   publicKey: string;
   dbType: DB_TYPE;
   dbHost: string;
-  dbUsername: string;
+  dbUsername?: string;
   dbPassword?: string;
-  dbName: string;
+  dbName?: string;
   configDirectory: string;
   dumpProgramsDirectory: string;
+  authenticationDatabase?: string;
 }
 
 const readFilePromisified = promisify(readFile);
@@ -48,6 +50,7 @@ const mergeConfig = (configSource = {}, configToApply) => {
     'dbUsername',
     'dbPassword',
     'dbName',
+    'authenticationDatabase',
   ];
   const mergedConfig = Object.assign({}, configSource);
   fields.forEach((fieldName) => {
@@ -61,7 +64,7 @@ const mergeConfig = (configSource = {}, configToApply) => {
 const saveAgentId = async (config: Config) => {
   try {
     await mkdirpPromisified(config.configDirectory);
-  } catch (e) {}
+  } catch (e) {} // eslint-disable-line
   const filePath = resolve(config.configDirectory, 'config.json');
   let configContent:any = {};
   try {
@@ -73,7 +76,7 @@ const saveAgentId = async (config: Config) => {
       logger.error('Couldn\'t parse JSON config file, using temp agentId', { filePath, error: e.message });
       return;
     }
-  } catch (e) {}
+  } catch (e) {} // eslint-disable-line
   configContent.agentId = config.agentId;
   try {
     await writeFilePromisified(filePath, JSON.stringify(configContent, null, 4));
@@ -89,7 +92,7 @@ export const getConfig = async (commandLine) => {
   try {
     const configFileContent = await getConfigFileContent(config.configDirectory);
     config = mergeConfig(config, configFileContent);
-  } catch (e) {}
+  } catch (e) {} // eslint-disable-line
   config = mergeConfig(config, {
     apikey: process.env.DBACKED_APIKEY,
     publicKey: process.env.DBACKED_PUBLIC_KEY,
@@ -98,6 +101,7 @@ export const getConfig = async (commandLine) => {
     dbUsername: process.env.DBACKED_DB_USERNAME,
     dbPassword: process.env.DBACKED_DB_PASSWORD,
     dbName: process.env.DBACKED_DB_NAME,
+    authenticationDatabase: process.env.DBACKED_AUTHENTICATION_DATABASE,
   });
   config = mergeConfig(config, {
     apikey: commandLine.apikey,
@@ -107,6 +111,7 @@ export const getConfig = async (commandLine) => {
     dbUsername: commandLine.dbUsername,
     dbPassword: commandLine.dbPassword,
     dbName: commandLine.dbName,
+    authenticationDatabase: commandLine.authenticationDatabase,
   });
   if (!config.agentId) {
     config.agentId = `${hostname()}-${randomstring.generate(4)}`;
@@ -121,17 +126,22 @@ export const getConfig = async (commandLine) => {
 
 export const getAndCheckConfig = async (commandLine) => {
   const config = await getConfig(commandLine);
-  [{
+  const requiredFields = [{
     field: config.apikey, arg: '--apikey', env: 'DBACKED_APIKEY', confName: 'apikey',
   }, {
     field: config.dbType, arg: '--db-type', env: 'DBACKED_DB_TYPE', confName: 'dbType',
   }, {
     field: config.dbHost, arg: '--db-host', env: 'DBACKED_DB_HOST', confName: 'dbHost',
-  }, {
-    field: config.dbUsername, arg: '--db-username', env: 'DBACKED_DB_USERNAME', confName: 'dbUsername',
-  }, {
-    field: config.dbName, arg: '--db-name', env: 'DBACKED_DB_NAME', confName: 'dbName',
-  }].forEach(({
+  }];
+  if (config.dbType !== 'mongodb') {
+    requiredFields.push({
+      field: config.dbUsername, arg: '--db-username', env: 'DBACKED_DB_USERNAME', confName: 'dbUsername',
+    });
+    requiredFields.push({
+      field: config.dbName, arg: '--db-name', env: 'DBACKED_DB_NAME', confName: 'dbName',
+    });
+  }
+  requiredFields.forEach(({
     field, arg, env, confName,
   }) => {
     assertExit(field && field.length, `${arg}, ${env} env variable or ${confName} config field required`);
@@ -145,13 +155,14 @@ export const getAndCheckConfig = async (commandLine) => {
 const requiredResponse = (input) => !!input || 'Required';
 
 export const askForConfig = async (config) => {
-  return prompt([
+  const outputConfig:any = {};
+  const generalConfig = <any> await prompt([
     {
       type: 'input',
       name: 'apikey',
       default: config.apikey,
-      async validate(apikey) {
-        registerApiKey(apikey);
+      async validate(input) {
+        registerApiKey(input);
         await getProject();
         return true;
       },
@@ -160,13 +171,40 @@ export const askForConfig = async (config) => {
       name: 'dbType',
       default: config.dbType,
       message: 'DB type:',
-      choices: ['pg', 'mysql'],
+      choices: ['pg', 'mysql', 'mongodb'],
+    }, {
+      name: 'agentId',
+      default: config.agentId,
+      message: 'Server name [OPTIONNAL]',
     }, {
       name: 'dbHost',
       message: 'DB host:',
       default: config.dbHost,
       validate: requiredResponse,
+    }]);
+  Object.assign(outputConfig, generalConfig);
+  if (generalConfig.dbType === 'mongodb') {
+    const dbOptions = <any> await prompt([{
+      name: 'dbUsername',
+      message: 'DB username: [OPTIONNAL]',
+      default: config.dbUsername,
     }, {
+      name: 'dbPassword',
+      message: 'DB password: [OPTIONNAL]',
+      default: config.dbPassword,
+    }, {
+      name: 'dbPassword',
+      message: 'Authentication database: [OPTIONNAL]',
+      default: config.authenticationDatabase,
+    }, {
+      name: 'dbName',
+      message: 'DB name: [OPTIONNAL]',
+      default: config.dbName,
+    },
+    ]);
+    Object.assign(outputConfig, dbOptions);
+  } else {
+    const dbOptions = <any> await prompt([{
       name: 'dbUsername',
       message: 'DB username:',
       default: config.dbUsername,
@@ -180,11 +218,9 @@ export const askForConfig = async (config) => {
       message: 'DB name:',
       default: config.dbName,
       validate: requiredResponse,
-    }, {
-      name: 'agentId',
-      default: config.agentId,
-      message: 'Server name [OPTIONNAL]',
-    },
-  ]);
+    }]);
+    Object.assign(outputConfig, dbOptions);
+  }
+  return outputConfig;
 };
 

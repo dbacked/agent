@@ -10,27 +10,57 @@ const zlib_1 = require("zlib");
 const randomBytesPromise = util_1.promisify(crypto_1.randomBytes);
 exports.startDumper = async (backupKey, config) => {
     log_1.default.debug('Starting dump');
-    let args;
-    if (config.dbType === 'pg') {
-        args = [
-            '-U', config.dbUsername, '-h', config.dbHost,
-            '--format=c',
-        ];
-        if (!config.dbPassword) {
-            args.push('--no-password');
-        }
-        args.push(config.dbName);
-    }
-    else if (config.dbType === 'mysql') {
-        args = [
-            '-u', config.dbUsername, '-h', config.dbHost,
-            '-C', '--single-transaction',
-        ];
-        if (config.dbPassword) {
-            args.push(`--password=${config.dbPassword}`);
-        }
-        args.push(config.dbName);
-    }
+    const args = {
+        pg: () => {
+            const pgArgs = [
+                '-h', config.dbHost,
+                '--format=c',
+            ];
+            if (config.dbUsername) {
+                pgArgs.push('-U');
+                pgArgs.push(config.dbUsername);
+            }
+            if (!config.dbPassword) {
+                pgArgs.push('--no-password');
+            }
+            pgArgs.push(config.dbName);
+            return pgArgs;
+        },
+        mysql: () => {
+            const mysqlArgs = [
+                '-h', config.dbHost,
+                '-C', '--single-transaction',
+            ];
+            if (config.dbUsername) {
+                mysqlArgs.push('-u');
+                mysqlArgs.push(config.dbUsername);
+            }
+            if (config.dbPassword) {
+                mysqlArgs.push(`--password=${config.dbPassword}`);
+            }
+            mysqlArgs.push(config.dbName);
+            return mysqlArgs;
+        },
+        mongodb: () => {
+            const mongodbArgs = [
+                '--host', config.dbHost,
+                '--archive',
+            ];
+            if (config.dbName) {
+                mongodbArgs.push('--db');
+                mongodbArgs.push(config.dbName);
+            }
+            if (config.dbUsername && config.dbPassword && config.authenticationDatabase) {
+                mongodbArgs.push('--username');
+                mongodbArgs.push(config.dbUsername);
+                mongodbArgs.push('--password');
+                mongodbArgs.push(config.dbPassword);
+                mongodbArgs.push('--authenticationDatabase');
+                mongodbArgs.push(config.authenticationDatabase);
+            }
+            return mongodbArgs;
+        },
+    }[config.dbType]();
     const iv = await randomBytesPromise(128 / 8);
     const cipher = crypto_1.createCipheriv('aes256', backupKey, iv);
     const dumpProcess = await child_process_1.spawn(path_1.resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`, 'dump'), args, {
