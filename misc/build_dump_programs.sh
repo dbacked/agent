@@ -31,6 +31,7 @@ cd ../
 rm -rf tmp
 aws s3 cp postgres.zip s3://dl.dbacked.com --acl public-read
 aws s3 cp postgres_md5 s3://dl.dbacked.com --acl public-read
+aws cloudfront create-invalidation --distribution-id EL5YBKNBM3EXK --path /postgres.zip /postgres_md5
 
 # ------------------------
 # MYSQL
@@ -51,6 +52,7 @@ cd ../
 rm -rf tmp
 aws s3 cp mysql.zip s3://dl.dbacked.com --acl public-read
 aws s3 cp mysql_md5 s3://dl.dbacked.com --acl public-read
+aws cloudfront create-invalidation --distribution-id EL5YBKNBM3EXK --path /mysql.zip /mysql_md5
 
 # ------------------------
 # MongoDB
@@ -72,3 +74,4 @@ cd ../
 rm -rf tmp
 aws s3 cp mongodb.zip s3://dl.dbacked.com --acl public-read
 aws s3 cp mongodb_md5 s3://dl.dbacked.com --acl public-read
+aws cloudfront create-invalidation --distribution-id EL5YBKNBM3EXK --path /mongodb.zip /mongodb_md5
