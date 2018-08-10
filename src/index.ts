@@ -9,9 +9,8 @@ import { VERSION } from './lib/constants';
 import { agentLoop } from './lib/backupJobManager';
 import { restoreBackup } from './lib/restoreBackup';
 
-
 yargs
-  .option('apikey', { string: true, describe: 'DBacked API key (can also be provided with the DBACKED_APIKEY env variable)' })
+  .option('apikey', { string: true, describe: 'DBacked API key (can also be provided with the DBACKED_APIKEY env variable) [Optionnal]' })
   .option('db-type', { string: true, desc: 'Database type (pg or mysql or mongodb) (env variable: DBACKED_DB_TYPE)' })
   .option('db-host', { string: true, desc: 'Database host (env variable: DBACKED_DB_HOST)' })
   .option('db-username', { string: true, desc: 'Database username (env variable: DBACKED_DB_USERNAME)' })

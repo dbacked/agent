@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const Table = require("cli-table");
 const log_1 = require("./log");
 function formatBytes(bytes, decimals = 2) {
     if (bytes === 0)
@@ -16,5 +17,14 @@ exports.assertExit = (test, message) => {
         log_1.default.error(message);
         process.exit(1);
     }
+};
+exports.formatDatabaseBackupableInfo = (databaseBackupableInfo) => {
+    const table = new Table({
+        head: ['Table name', 'Lines count'],
+    });
+    databaseBackupableInfo.forEach(({ name, lineCount }) => {
+        table.push([name, lineCount]);
+    });
+    return table.toString();
 };
 //# sourceMappingURL=helpers.js.map

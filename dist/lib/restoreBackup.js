@@ -91,10 +91,7 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
     }
 };
 exports.restoreBackup = async (commandLine) => {
-    const config = await config_1.getConfig(commandLine);
-    if (!commandLine.y) {
-        Object.assign(config, await config_1.askForConfig(config));
-    }
+    const config = await config_1.getConfig(commandLine, { interactive: !commandLine.y });
     const backupStream = await getBackupStream(config, {
         useLastBackup: commandLine.lastBackup,
         useStdin: commandLine.rawInput,

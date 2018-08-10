@@ -2,51 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const util_1 = require("util");
 const fs_1 = require("fs");
-const mkdirp = require("mkdirp");
-const path_1 = require("path");
 const isRoot = require("is-root");
 const child_process_1 = require("child_process");
 const log_1 = require("./log");
-const dbackedApi_1 = require("./dbackedApi");
 const config_1 = require("./config");
-const readFilePromisified = util_1.promisify(fs_1.readFile);
-const mkdirpPromisified = util_1.promisify(mkdirp);
 const writeFilePromisified = util_1.promisify(fs_1.writeFile);
 const copyFilePromisified = util_1.promisify(fs_1.copyFile);
 const execPromisified = util_1.promisify(child_process_1.exec);
-const saveConfig = async (configDirectory, config) => {
-    try {
-        await mkdirpPromisified(configDirectory);
-    }
-    catch (e) { }
-    const filePath = path_1.resolve(configDirectory, 'config.json');
-    let configContent = {};
-    try {
-        const fileContent = await readFilePromisified(filePath, { encoding: 'utf-8' });
-        try {
-            configContent = JSON.parse(fileContent);
-        }
-        catch (e) { }
-    }
-    catch (e) { }
-    try {
-        await writeFilePromisified(filePath, JSON.stringify(Object.assign({}, configContent, config), null, 4));
-    }
-    catch (e) {
-        log_1.default.error('Couldn\'t save JSON config file', { filePath, error: e.message });
-    }
-};
-const askAndCreateConfigFile = async (sourceConfig, { interactive }) => {
-    const config = Object.assign({}, sourceConfig);
-    if (interactive) {
-        const responses = await config_1.askForConfig(config);
-        Object.assign(config, responses);
-    }
-    dbackedApi_1.registerApiKey(config.apikey);
-    config.publicKey = (await dbackedApi_1.getProject()).publicKey;
-    await saveConfig(config.configDirectory, config);
-    return config;
-};
 const stopPreviousSystemdService = async () => {
     try {
         await execPromisified('systemctl stop dbacked.service');
@@ -84,9 +46,13 @@ exports.installAgent = async (commandLine) => {
         console.error('Should be executed as root to install (as we are creating a systemd service)');
         process.exit(1);
     }
-    const config = await config_1.getConfig(commandLine);
-    await askAndCreateConfigFile(config, { interactive: !commandLine.y });
-    const isSystemd = (await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n';
+    await config_1.getConfig(commandLine, { interactive: !commandLine.y, saveOnDisk: true });
+    let isSystemd = false;
+    try {
+        isSystemd = (await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n';
+    }
+    catch (e) { }
+    ; // eslint-disable-line
     if (isSystemd) {
         await stopPreviousSystemdService();
     }

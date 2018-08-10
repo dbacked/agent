@@ -3,11 +3,17 @@ import { promisify } from 'util';
 import { readFile, writeFile } from 'fs';
 import { hostname } from 'os';
 import { prompt } from 'inquirer';
+import * as forge from 'node-forge';
 import * as randomstring from 'randomstring';
 import * as mkdirp from 'mkdirp';
-import logger from './log';
-import assertExit from './assertExit';
+import * as cronParser from 'cron-parser';
+
+import { fromPairs, snakeCase, kebabCase } from 'lodash';
 import { getProject, registerApiKey } from './dbackedApi';
+import logger from './log';
+import { getDatabaseBackupableInfo } from './dbStats';
+import { getBucketInfo } from './s3';
+import { formatDatabaseBackupableInfo } from './helpers';
 
 export enum DB_TYPE {
   pg = 'pg',
@@ -15,212 +21,279 @@ export enum DB_TYPE {
   mongodb = 'mongodb',
 }
 
+export enum SUBSCRIPTION_TYPE {
+  free = 'free',
+  premium = 'premium',
+}
+
 export interface Config {
-  agentId: string;
-  apikey: string;
   publicKey: string;
+  // Storage config
+  subscriptionType: SUBSCRIPTION_TYPE;
+  apikey?: string;
+  s3accessKeyId?: string;
+  s3secretAccessKey?: string;
+  s3region?: string;
+  s3bucket?: string;
+  // DB info
   dbType: DB_TYPE;
-  dbHost: string;
+  dbHost?: string;
+  dbPort?: string;
   dbUsername?: string;
   dbPassword?: string;
   dbName?: string;
+  dbConnectionString?: string;
+  // Agent config
+  agentId: string;
   configDirectory: string;
   dumpProgramsDirectory: string;
-  authenticationDatabase?: string;
+  dumperOptions?: string;
+  cron?: string;
 }
 
-const readFilePromisified = promisify(readFile);
-const mkdirpPromisified = promisify(mkdirp);
-const writeFilePromisified = promisify(writeFile);
+const configFields = [
+  {
+    name: 'subscriptionType',
+    desc: 'What version of DBacked do you want to use?',
+    options: [{ name: 'DBacked Free', value: 'free' }, { name: 'DBacked Pro', value: 'premium' }],
+    required: true,
+  },
+  { name: 'agentId', desc: 'Server name', default: `${hostname()}-${randomstring.generate(4)}` },
+  { name: 'configDirectory', desc: 'Configuration directory', default: '/etc/dbacked' },
+  { name: 'dumpProgramsDirectory', desc: 'Database dumper and restorer download location', default: '/tmp/dbacked_dumpers' },
+  {
+    name: 'apikey',
+    desc: 'DBacked API key',
+    if: ({ subscriptionType }: Config) => subscriptionType === 'premium',
+    validate: async (config: Config) => {
+      registerApiKey(config.apikey);
+      await getProject();
+      return true;
+    },
+  }, {
+    name: 's3accessKeyId',
+    desc: 'S3 Access Key ID',
+    if: ({ subscriptionType }: Config) => subscriptionType === 'free',
+    required: true,
+  }, {
+    name: 's3secretAccessKey',
+    desc: 'S3 Secret Access Key',
+    type: 'password',
+    if: ({ subscriptionType }: Config) => subscriptionType === 'free',
+    required: true,
+  }, {
+    name: 's3region',
+    desc: 'S3 Region',
+    if: ({ subscriptionType }: Config) => subscriptionType === 'free',
+    // TODO: validate region
+    required: true,
+  }, {
+    name: 's3bucket',
+    desc: 'S3 Bucket',
+    if: ({ subscriptionType }: Config) => subscriptionType === 'free',
+    required: true,
+    validate: async (config: Config) => {
+      const {
+        s3accessKeyId, s3secretAccessKey, s3region, s3bucket,
+      } = config;
+      try {
+        await getBucketInfo({
+          s3accessKeyId, s3secretAccessKey, s3bucket, s3region,
+        });
+        return true;
+      } catch (e) {
+        return `Error from S3: ${e.toString()}`;
+      }
+    },
+  }, {
+    name: 'publicKey',
+    type: 'editor',
+    required: true,
+    desc: 'RSA Public Key to encrypt the backups',
+    validate: (config: Config) => {
+      const { publicKey } = config;
+      try {
+        forge.pki.publicKeyFromPem(publicKey);
+        return true;
+      } catch (e) {
+        return `Error while testing public key: ${e.toString()}`;
+      }
+    },
+  },
+  {
+    name: 'dbType',
+    desc: 'Database type',
+    options: [
+      { name: 'PostgreSQL', value: 'pg' },
+      { name: 'MySQL', value: 'mysql' },
+      { name: 'MongoDB', value: 'mongodb' },
+    ],
+    required: 'true',
+  },
+  {
+    name: 'dbConnectionString',
+    desc: 'Database connection string (starts with mongodb://)',
+    if: ({ dbType }: Config) => dbType === 'mongodb',
+  },
+  { name: 'dbHost', desc: 'Database Host', if: ({ dbType }: Config) => dbType !== 'mongodb' },
+  { name: 'dbPort', desc: 'Database Port', if: ({ dbType }: Config) => dbType !== 'mongodb' },
+  {
+    name: 'dbUsername',
+    desc: 'Database username',
+    required: true,
+    if: ({ dbType }: Config) => dbType !== 'mongodb',
+  }, {
+    name: 'dbPassword',
+    desc: 'Database password',
+    type: 'password',
+    if: ({ dbType }: Config) => dbType !== 'mongodb',
+  }, {
+    name: 'dbName',
+    desc: 'Database name',
+    required: true,
+    validate: async (config: Config) => {
+      try {
+        const databaseBackupableInfo = await getDatabaseBackupableInfo(config.dbType, config);
+        console.log('\nDBacked will backup these tables: (lines counts are an estimate)');
+        console.log(formatDatabaseBackupableInfo(databaseBackupableInfo));
+        return true;
+      } catch (e) {
+        return `Error while connecting to database: ${e.toString()}`;
+      }
+    },
+  },
+  { name: 'dumperOptions', desc: 'Command line option to set on pg_dump, mongodump or mysqldump' },
+  {
+    name: 'cron',
+    desc: 'When do you want to start the backups? (UTC Cron Expression)',
+    if: ({ subscriptionType }: Config) => subscriptionType === 'free',
+    validate: (config: Config) => {
+      try {
+        cronParser.parseExpression(config.cron);
+        return true;
+      } catch (e) {
+        return `Error while parsing cron expression: ${e.toString()}`;
+      }
+    },
+  },
+];
 
+const readFilePromisified = promisify(readFile);
 export const getConfigFileContent = async (configDirectory) => {
   const filePath = resolve(configDirectory, 'config.json');
   const fileContent = await readFilePromisified(filePath, { encoding: 'utf-8' });
-  const content = JSON.parse(fileContent);
-  return content;
+  return JSON.parse(fileContent);
 };
 
-const mergeConfig = (configSource = {}, configToApply) => {
-  const fields = [
-    'agentId',
-    'apikey',
-    'publicKey',
-    'dbType',
-    'dbHost',
-    'dbUsername',
-    'dbPassword',
-    'dbName',
-    'authenticationDatabase',
-  ];
-  const mergedConfig = Object.assign({}, configSource);
-  fields.forEach((fieldName) => {
-    if (configToApply[fieldName]) {
-      mergedConfig[fieldName] = configToApply[fieldName];
-    }
-  });
-  return mergedConfig;
+// Create a new object from merge of both config object
+const mergeConfigs = (...configs) => {
+  // Merge without undefined values
+  return <Config> Object.assign({}, ...configs.map((x) =>
+    Object.entries(x)
+      .filter(([, value]) => value !== undefined)
+      .reduce((obj, [key, value]) => {
+        obj[key] = value; // eslint-disable-line
+        return obj;
+      }, {})));
 };
 
-const saveAgentId = async (config: Config) => {
+const mkdirpPromisified = promisify(mkdirp);
+const writeFilePromisified = promisify(writeFile);
+const saveConfig = async (config: Config) => {
   try {
     await mkdirpPromisified(config.configDirectory);
   } catch (e) {} // eslint-disable-line
   const filePath = resolve(config.configDirectory, 'config.json');
-  let configContent:any = {};
   try {
-    const fileContent = await readFilePromisified(filePath, { encoding: 'utf-8' });
-    try {
-      configContent = JSON.parse(fileContent);
-    } catch (e) {
-      // the file is not a JSON file, do not save it and exit now
-      logger.error('Couldn\'t parse JSON config file, using temp agentId', { filePath, error: e.message });
-      return;
-    }
-  } catch (e) {} // eslint-disable-line
-  configContent.agentId = config.agentId;
-  try {
-    await writeFilePromisified(filePath, JSON.stringify(configContent, null, 4));
+    await writeFilePromisified(filePath, JSON.stringify(config, null, 4));
   } catch (e) {
-    logger.error('Couldn\'t save JSON config file, using temp agentId', { filePath, error: e.message });
+    logger.error('Couldn\'t save JSON config file', { filePath, error: e.message });
   }
 };
 
-export const getConfig = async (commandLine) => {
-  let config:any = {
+const askForConfig = async (inferredConfig) => {
+  const answers:any = {};
+  for (const configField of configFields) {
+    if (configField.if && !configField.if(mergeConfigs(inferredConfig, answers))) {
+      continue;
+    }
+    const answer = <any> await prompt(<any>{
+      type: configField.type || (configField.options ? 'list' : 'input'),
+      name: 'res',
+      default: inferredConfig[configField.name] || configField.default,
+      message: configField.desc,
+      choices: configField.options,
+      validate: async (res) => {
+        if (configField.required && !res) {
+          return 'Required';
+        }
+        if (configField.validate) {
+          return configField.validate(<any>mergeConfigs(
+            inferredConfig,
+            answers,
+            { [configField.name]: res },
+          ));
+        }
+        return true;
+      },
+    });
+    answers[configField.name] = answer.res;
+  }
+  return mergeConfigs(inferredConfig, answers);
+};
+
+const checkConfig = async (config: Config) => {
+  const errors = [];
+  for (const configField of configFields) {
+    let error;
+    if (configField.if && !configField.if(config)) {
+      continue;
+    }
+    if (configField.required && !config[configField.name]) {
+      error = 'Required';
+    } else if (configField.validate) {
+      const validateResult = await configField.validate(<any>config);
+      if (validateResult !== true) {
+        error = validateResult || 'Parsing error';
+      }
+    }
+    if (error) {
+      errors.push(`Error with '${configField.name}': ${error} (configurable with DBACKED_${snakeCase(configField.name).toUpperCase()} env variable, --${kebabCase(configField.name)} command line arg of ${configField.name} config variable)`);
+    }
+  }
+  if (errors.length) {
+    throw new Error(errors.join('\n'));
+  }
+};
+
+export const getConfig = async (
+  commandLine,
+  { interactive = false, saveOnDisk = false } = {},
+) => {
+  let config : any = {
     configDirectory: commandLine.configDirectory || '/etc/dbacked',
   };
   try {
     const configFileContent = await getConfigFileContent(config.configDirectory);
-    config = mergeConfig(config, configFileContent);
+    config = mergeConfigs(config, configFileContent);
   } catch (e) {} // eslint-disable-line
-  config = mergeConfig(config, {
-    apikey: process.env.DBACKED_APIKEY,
-    publicKey: process.env.DBACKED_PUBLIC_KEY,
-    dbType: process.env.DBACKED_DB_TYPE,
-    dbHost: process.env.DBACKED_DB_HOST,
-    dbUsername: process.env.DBACKED_DB_USERNAME,
-    dbPassword: process.env.DBACKED_DB_PASSWORD,
-    dbName: process.env.DBACKED_DB_NAME,
-    authenticationDatabase: process.env.DBACKED_AUTHENTICATION_DATABASE,
-  });
-  config = mergeConfig(config, {
-    apikey: commandLine.apikey,
-    publicKey: commandLine.publicKey,
-    dbType: commandLine.dbType,
-    dbHost: commandLine.dbHost,
-    dbUsername: commandLine.dbUsername,
-    dbPassword: commandLine.dbPassword,
-    dbName: commandLine.dbName,
-    authenticationDatabase: commandLine.authenticationDatabase,
-  });
-  if (!config.agentId) {
-    config.agentId = `${hostname()}-${randomstring.generate(4)}`;
-    await saveAgentId(config);
+  // Get config from env variables
+  config = mergeConfigs(config, fromPairs(configFields.map(({ name }) => [
+    name,
+    process.env[`DBACKED_${snakeCase(name).toUpperCase()}`],
+  ])));
+  // Get config from commandLine
+  config = mergeConfigs(config, fromPairs(configFields.map(({ name }) => [
+    name,
+    commandLine[kebabCase(name)],
+  ])));
+  if (interactive) {
+    config = await askForConfig(config);
   }
-  if (!config.dumpProgramsDirectory) {
-    config.dumpProgramsDirectory = '/tmp/dbacked_dumpers';
+  await checkConfig(config);
+  if (saveOnDisk) {
+    await saveConfig(config);
   }
-
   return <Config>config;
-};
-
-export const getAndCheckConfig = async (commandLine) => {
-  const config = await getConfig(commandLine);
-  const requiredFields = [{
-    field: config.apikey, arg: '--apikey', env: 'DBACKED_APIKEY', confName: 'apikey',
-  }, {
-    field: config.dbType, arg: '--db-type', env: 'DBACKED_DB_TYPE', confName: 'dbType',
-  }, {
-    field: config.dbHost, arg: '--db-host', env: 'DBACKED_DB_HOST', confName: 'dbHost',
-  }];
-  if (config.dbType !== 'mongodb') {
-    requiredFields.push({
-      field: config.dbUsername, arg: '--db-username', env: 'DBACKED_DB_USERNAME', confName: 'dbUsername',
-    });
-    requiredFields.push({
-      field: config.dbName, arg: '--db-name', env: 'DBACKED_DB_NAME', confName: 'dbName',
-    });
-  }
-  requiredFields.forEach(({
-    field, arg, env, confName,
-  }) => {
-    assertExit(field && field.length, `${arg}, ${env} env variable or ${confName} config field required`);
-  });
-  if (!config.publicKey) {
-    logger.warn('You didn\'t provide your public key via the --public-key or env varible DBACKED_PUBLIC_KEY or publicKey config key, your public key will be downloaded from the DBacked server, this could expose you to a man in the middle attack on your backups');
-  }
-  return config;
-};
-
-const requiredResponse = (input) => !!input || 'Required';
-
-export const askForConfig = async (config) => {
-  const outputConfig:any = {};
-  const generalConfig = <any> await prompt([
-    {
-      type: 'input',
-      name: 'apikey',
-      default: config.apikey,
-      async validate(input) {
-        registerApiKey(input);
-        await getProject();
-        return true;
-      },
-    }, {
-      type: 'list',
-      name: 'dbType',
-      default: config.dbType,
-      message: 'DB type:',
-      choices: ['pg', 'mysql', 'mongodb'],
-    }, {
-      name: 'agentId',
-      default: config.agentId,
-      message: 'Server name [OPTIONNAL]',
-    }, {
-      name: 'dbHost',
-      message: 'DB host:',
-      default: config.dbHost,
-      validate: requiredResponse,
-    }]);
-  Object.assign(outputConfig, generalConfig);
-  if (generalConfig.dbType === 'mongodb') {
-    const dbOptions = <any> await prompt([{
-      name: 'dbUsername',
-      message: 'DB username: [OPTIONNAL]',
-      default: config.dbUsername,
-    }, {
-      name: 'dbPassword',
-      message: 'DB password: [OPTIONNAL]',
-      default: config.dbPassword,
-    }, {
-      name: 'dbPassword',
-      message: 'Authentication database: [OPTIONNAL]',
-      default: config.authenticationDatabase,
-    }, {
-      name: 'dbName',
-      message: 'DB name: [OPTIONNAL]',
-      default: config.dbName,
-    },
-    ]);
-    Object.assign(outputConfig, dbOptions);
-  } else {
-    const dbOptions = <any> await prompt([{
-      name: 'dbUsername',
-      message: 'DB username:',
-      default: config.dbUsername,
-      validate: requiredResponse,
-    }, {
-      name: 'dbPassword',
-      message: 'DB password: [OPTIONNAL]',
-      default: config.dbPassword,
-    }, {
-      name: 'dbName',
-      message: 'DB name:',
-      default: config.dbName,
-      validate: requiredResponse,
-    }]);
-    Object.assign(outputConfig, dbOptions);
-  }
-  return outputConfig;
 };
 

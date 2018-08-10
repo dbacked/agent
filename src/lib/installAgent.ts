@@ -1,51 +1,14 @@
 import { promisify } from 'util';
-import { writeFile, readFile, copyFile } from 'fs';
-import * as mkdirp from 'mkdirp';
-import { resolve } from 'path';
+import { writeFile, copyFile } from 'fs';
 import * as isRoot from 'is-root';
 import { exec } from 'child_process';
 
 import logger from './log';
-import { registerApiKey, getProject } from './dbackedApi';
-import { getConfig, askForConfig } from './config';
+import { getConfig } from './config';
 
-const readFilePromisified = promisify(readFile);
-const mkdirpPromisified = promisify(mkdirp);
 const writeFilePromisified = promisify(writeFile);
 const copyFilePromisified = promisify(copyFile);
 const execPromisified = promisify(exec);
-
-
-const saveConfig = async (configDirectory, config) => {
-  try {
-    await mkdirpPromisified(configDirectory);
-  } catch (e) {}
-  const filePath = resolve(configDirectory, 'config.json');
-  let configContent:any = {};
-  try {
-    const fileContent = await readFilePromisified(filePath, { encoding: 'utf-8' });
-    try {
-      configContent = JSON.parse(fileContent);
-    } catch (e) {}
-  } catch (e) {}
-  try {
-    await writeFilePromisified(filePath, JSON.stringify(Object.assign({}, configContent, config), null, 4));
-  } catch (e) {
-    logger.error('Couldn\'t save JSON config file', { filePath, error: e.message });
-  }
-};
-
-const askAndCreateConfigFile = async (sourceConfig, { interactive }) => {
-  const config:any = Object.assign({}, sourceConfig);
-  if (interactive) {
-    const responses = await askForConfig(config);
-    Object.assign(config, responses);
-  }
-  registerApiKey(config.apikey);
-  config.publicKey = (await getProject()).publicKey;
-  await saveConfig(config.configDirectory, config);
-  return config;
-};
 
 const stopPreviousSystemdService = async () => {
   try {
@@ -84,9 +47,11 @@ export const installAgent = async (commandLine) => {
     console.error('Should be executed as root to install (as we are creating a systemd service)');
     process.exit(1);
   }
-  const config = await getConfig(commandLine);
-  await askAndCreateConfigFile(config, { interactive: !commandLine.y });
-  const isSystemd = (await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n';
+  await getConfig(commandLine, { interactive: !commandLine.y, saveOnDisk: true });
+  let isSystemd = false;
+  try {
+    isSystemd = (await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n';
+  } catch (e) {}; // eslint-disable-line
   if (isSystemd) {
     await stopPreviousSystemdService();
   }

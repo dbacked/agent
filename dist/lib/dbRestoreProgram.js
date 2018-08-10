@@ -33,13 +33,11 @@ exports.restoreDb = async (stream, config) => {
                 mongodbArgs.push('--db');
                 mongodbArgs.push(config.dbName);
             }
-            if (config.dbPassword) {
+            if (config.dbUsername && config.dbPassword) {
                 mongodbArgs.push('--username');
                 mongodbArgs.push(config.dbUsername);
                 mongodbArgs.push('--password');
                 mongodbArgs.push(config.dbPassword);
-                mongodbArgs.push('--authenticationDatabase');
-                mongodbArgs.push(config.authenticationDatabase);
             }
             return mongodbArgs;
         },

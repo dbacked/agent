@@ -1,4 +1,5 @@
 import Axios from 'axios';
+import { S3 } from 'aws-sdk';
 import { createHash } from 'crypto';
 
 import logger from './log';
@@ -18,7 +19,7 @@ const uploadChunkToS3 = async ({ url, chunk, hash }, retryCount = 0) => {
         'Content-MD5': hash,
       },
       transformRequest: [(data, headers) => {
-        delete headers.put['Content-Type'];
+        delete headers.put['Content-Type']; // eslint-disable-line
         return data;
       }],
     });
@@ -54,7 +55,7 @@ export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
   logger.info('Starting backup upload');
   const promisifedStream = new PromisifiedReadableStream(fileStream);
   const partsEtag = [];
-  while (true) {
+  while (true) { // eslint-disable-line
     const chunkSize = getChunkSize(partsEtag.length);
     promisifedStream.setSize(chunkSize);
     logger.debug('Waiting for chunk', { partCount: partsEtag.length, size: chunkSize });
@@ -72,4 +73,19 @@ export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
   }
   logger.debug('Finished uploading chunks');
   return partsEtag;
+};
+
+export const getBucketInfo = async ({
+  s3accessKeyId, s3secretAccessKey, s3region, s3bucket,
+}) => {
+  const s3 = new S3({
+    accessKeyId: s3accessKeyId,
+    secretAccessKey: s3secretAccessKey,
+    signatureVersion: 'v4',
+    region: s3region,
+  });
+  const bucketInfo = s3.headBucket({
+    Bucket: s3bucket,
+  }).promise();
+  return bucketInfo;
 };

@@ -45,7 +45,7 @@ exports.startDatabaseBackupJob = (config, backupInfo) => {
 };
 const mkdirPromise = util_1.promisify(fs_1.mkdir);
 exports.agentLoop = async (commandLineArgs) => {
-    const config = await config_1.getAndCheckConfig(commandLineArgs);
+    const config = await config_1.getConfig(commandLineArgs);
     log_1.default.info('Agent id:', { agentId: config.agentId });
     dbackedApi_1.registerApiKey(config.apikey);
     // Used to test the apiKey before daemonizing

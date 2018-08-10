@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("axios");
+const aws_sdk_1 = require("aws-sdk");
 const crypto_1 = require("crypto");
 const log_1 = require("./log");
 const delay_1 = require("./delay");
@@ -71,5 +72,17 @@ exports.uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
     }
     log_1.default.debug('Finished uploading chunks');
     return partsEtag;
+};
+exports.getBucketInfo = async ({ s3accessKeyId, s3secretAccessKey, s3region, s3bucket, }) => {
+    const s3 = new aws_sdk_1.S3({
+        accessKeyId: s3accessKeyId,
+        secretAccessKey: s3secretAccessKey,
+        signatureVersion: 'v4',
+        region: s3region,
+    });
+    const bucketInfo = s3.headBucket({
+        Bucket: s3bucket,
+    }).promise();
+    return bucketInfo;
 };
 //# sourceMappingURL=s3.js.map

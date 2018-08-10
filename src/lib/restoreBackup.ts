@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import Axios from 'axios';
 import { pki } from 'node-forge';
 
-import { getConfig, askForConfig } from './config';
+import { getConfig } from './config';
 import { getProject, registerApiKey, getBackupDownloadUrl } from './dbackedApi';
 import logger from './log';
 import { formatBytes } from './helpers';
@@ -90,10 +90,7 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
 };
 
 export const restoreBackup = async (commandLine) => {
-  const config = await getConfig(commandLine);
-  if (!commandLine.y) {
-    Object.assign(config, await askForConfig(config));
-  }
+  const config = await getConfig(commandLine, { interactive: !commandLine.y });
 
   const backupStream = await getBackupStream(config, {
     useLastBackup: commandLine.lastBackup,

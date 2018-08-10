@@ -1,3 +1,4 @@
+import * as Table from 'cli-table';
 import logger from './log';
 
 export function formatBytes(bytes, decimals = 2) {
@@ -15,3 +16,14 @@ export const assertExit = (test, message) => {
     process.exit(1);
   }
 };
+
+export const formatDatabaseBackupableInfo = (databaseBackupableInfo) => {
+  const table = new Table({
+    head: ['Table name', 'Lines count'],
+  });
+  databaseBackupableInfo.forEach(({ name, lineCount }) => {
+    table.push([name, lineCount]);
+  });
+  return table.toString();
+};
+

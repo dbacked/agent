@@ -9,7 +9,7 @@ import * as downgradeRoot from 'downgrade-root';
 import { getProject, registerApiKey, reportError, waitForBackup } from './dbackedApi';
 import { delay } from './delay';
 import logger from './log';
-import { getAndCheckConfig } from './config';
+import { getConfig } from './config';
 
 export const startDatabaseBackupJob = (config, backupInfo) => {
   return new Promise((resolvePromise, reject) => {
@@ -44,7 +44,7 @@ export const startDatabaseBackupJob = (config, backupInfo) => {
 const mkdirPromise = promisify(mkdir);
 
 export const agentLoop = async (commandLineArgs) => {
-  const config = await getAndCheckConfig(commandLineArgs);
+  const config = await getConfig(commandLineArgs);
 
   logger.info('Agent id:', { agentId: config.agentId });
   registerApiKey(config.apikey);

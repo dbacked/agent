@@ -17,7 +17,9 @@ module.exports = {
       "no-loop-func": 0,
       "no-underscore-dangle": 0,
       "import/first": 0,
-      "global-require": 0
+      "global-require": 0,
+      "no-restricted-syntax": 0,
+      "no-continue": 0
   },
   "plugins": [
       "typescript",
