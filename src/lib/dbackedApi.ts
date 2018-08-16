@@ -3,6 +3,7 @@ import axios, { AxiosInstance } from 'axios';
 import { API_ROOT, VERSION } from './constants';
 import { delay } from './delay';
 import logger from './log';
+import { Config, SUBSCRIPTION_TYPE } from './config';
 
 let api: AxiosInstance;
 
@@ -39,7 +40,7 @@ export const createBackup = async ({
   return data;
 };
 
-export const waitForBackup = async (config) => {
+export const waitForNextBackupNeededFromAPI = async (config:Config) => {
   while (true) {
     try {
       const backupInfo = await createBackup(config);

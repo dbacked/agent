@@ -1,7 +1,13 @@
+import * as uuidv4 from 'uuid/v4';
+import { fromPairs } from 'lodash';
 import { Client } from 'pg';
 import { createConnection } from 'mysql';
 import { MongoClient } from 'mongodb';
 import { promisify } from 'util';
+import { DateTime } from 'luxon';
+import * as cronParser from 'cron-parser';
+import { Config } from './config';
+import { delay } from './delay';
 
 interface DB_CONNECTION_INFO {
   dbHost?: string;
@@ -14,7 +20,7 @@ interface DB_CONNECTION_INFO {
 
 const databaseTypes = {
   pg: {
-    getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {
+    createClient: (connectionInfo: DB_CONNECTION_INFO) => {
       const client = new Client({
         host: connectionInfo.dbHost,
         port: connectionInfo.dbPort ? Number(connectionInfo.dbPort) : undefined,
@@ -23,6 +29,10 @@ const databaseTypes = {
         password: connectionInfo.dbPassword,
       });
       client.connect();
+      return client;
+    },
+    getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {
+      const client = databaseTypes.pg.createClient(connectionInfo);
       const info = await client.query(`SELECT
         relname as name, reltuples as "lineCount"
         FROM pg_class C
@@ -33,6 +43,28 @@ const databaseTypes = {
         ORDER BY reltuples DESC;
       `);
       return info.rows;
+    },
+    initDatabase: async (connectionInfo: DB_CONNECTION_INFO) => {
+      // If the database is already initiated, this will do nothing
+      const client = databaseTypes.pg.createClient(connectionInfo);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS dbacked (
+          key text PRIMARY KEY,
+          value text
+        );
+      `);
+      await client.query(`
+        INSERT INTO dbacked (key, value)
+        VALUES ('dbId', $1)
+        ON CONFLICT (key) DO NOTHING
+      `, [uuidv4()]);
+    },
+    getDatabaseBackupStatus: async (connectionInfo: DB_CONNECTION_INFO) => {
+      const client = databaseTypes.pg.createClient(connectionInfo);
+      const info = await client.query(`
+        SELECT * from dbacked;
+      `);
+      return fromPairs(info.rows.map(({ key, value }) => [key, value]));
     },
   },
   mysql: {
@@ -52,6 +84,8 @@ const databaseTypes = {
       `);
       return res;
     },
+    // TODO: initDatabase for mysql
+    // TODO: getDatabaseBackupStatus for mysql
   },
   mongodb: {
     getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {
@@ -67,8 +101,36 @@ const databaseTypes = {
         return { name, lineCount };
       }));
     },
+    // TODO: initDatabase for mongodb
+    // TODO: getDatabaseBackupStatus for mongodb
   },
 };
 
 export const getDatabaseBackupableInfo = async (dbType, connectionInfo: DB_CONNECTION_INFO) =>
   databaseTypes[dbType].getDatabaseBackupableInfo(connectionInfo);
+
+export const initDatabase = async (dbType, connectionInfo: DB_CONNECTION_INFO) =>
+  databaseTypes[dbType].initDatabase(connectionInfo);
+
+export const getDatabaseBackupStatus = async (dbType, connectionInfo: DB_CONNECTION_INFO) =>
+  databaseTypes[dbType].getDatabaseBackupStatus(connectionInfo);
+
+const isBackupNeeded = async (config: Config) => {
+  const backupStatus = await getDatabaseBackupStatus(config.dbType, config);
+
+  const lastBackupDate = DateTime.fromMillis(backupStatus.lastBackupDate || 0).toUTC();
+  const cronExpression = cronParser.parseExpression(config.cron, { utc: true });
+
+  const idealPreviousCronDate = DateTime.fromJSDate(cronExpression.prev().toDate()).toUTC();
+  return lastBackupDate.diff(idealPreviousCronDate).as('minutes') < 0;
+};
+
+export const waitForNextBackupNeededFromDatabase = async (config: Config) => {
+  while (true) {
+    if (await isBackupNeeded(config)) {
+      return true;
+    }
+    // If no backup needed, wait 4 minutes and try again
+    await delay(1000 * 60 * 5);
+  }
+};

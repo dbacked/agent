@@ -34,7 +34,7 @@ exports.createBackup = async ({ agentId, dbType, }) => {
     });
     return data;
 };
-exports.waitForBackup = async (config) => {
+exports.waitForNextBackupNeededFromAPI = async (config) => {
     while (true) {
         try {
             const backupInfo = await exports.createBackup(config);

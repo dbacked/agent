@@ -13,7 +13,7 @@ const execPromisified = promisify(exec);
 const stopPreviousSystemdService = async () => {
   try {
     await execPromisified('systemctl stop dbacked.service');
-  } catch (e) {}; // eslint-disable-line
+  } catch (e) {}
 };
 
 const installSystemdService = async () => {
@@ -51,7 +51,7 @@ export const installAgent = async (commandLine) => {
   let isSystemd = false;
   try {
     isSystemd = (await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n';
-  } catch (e) {}; // eslint-disable-line
+  } catch (e) {}
   if (isSystemd) {
     await stopPreviousSystemdService();
   }

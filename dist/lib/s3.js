@@ -19,7 +19,7 @@ const uploadChunkToS3 = async ({ url, chunk, hash }, retryCount = 0) => {
                 'Content-MD5': hash,
             },
             transformRequest: [(data, headers) => {
-                    delete headers.put['Content-Type'];
+                    delete headers.put['Content-Type']; // eslint-disable-line
                     return data;
                 }],
         });
@@ -84,5 +84,53 @@ exports.getBucketInfo = async ({ s3accessKeyId, s3secretAccessKey, s3region, s3b
         Bucket: s3bucket,
     }).promise();
     return bucketInfo;
+};
+exports.initMultipartUpload = async (filename, config) => {
+    const s3 = new aws_sdk_1.S3({
+        accessKeyId: config.s3accessKeyId,
+        secretAccessKey: config.s3secretAccessKey,
+        signatureVersion: 'v4',
+        region: config.s3region,
+    });
+    const { UploadId } = await s3.createMultipartUpload({
+        Bucket: config.s3bucket,
+        Key: filename,
+        ContentType: 'application/octet-stream',
+    }).promise();
+    return UploadId;
+};
+exports.getUploadPartUrlFromLocalCredentials = async ({ uploadId, filename, partNumber, partHash, }, config) => {
+    const s3 = new aws_sdk_1.S3({
+        accessKeyId: config.s3accessKeyId,
+        secretAccessKey: config.s3secretAccessKey,
+        signatureVersion: 'v4',
+        region: config.s3region,
+    });
+    return s3.getSignedUrl('uploadPart', {
+        Bucket: config.s3bucket,
+        Key: filename,
+        UploadId: uploadId,
+        PartNumber: partNumber,
+        ContentMD5: partHash,
+    });
+};
+exports.completeMultipartUpload = async ({ filename, uploadId, partsEtag, }, config) => {
+    const s3 = new aws_sdk_1.S3({
+        accessKeyId: config.s3accessKeyId,
+        secretAccessKey: config.s3secretAccessKey,
+        signatureVersion: 'v4',
+        region: config.s3region,
+    });
+    return await s3.completeMultipartUpload({
+        Bucket: config.s3bucket,
+        Key: filename,
+        UploadId: uploadId,
+        MultipartUpload: {
+            Parts: partsEtag.map((etag, i) => ({
+                PartNumber: i + 1,
+                ETag: etag,
+            })),
+        },
+    }).promise();
 };
 //# sourceMappingURL=s3.js.map

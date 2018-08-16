@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import logger from './log';
 import { delay } from './delay';
 import PromisifiedReadableStream from './streamToPromise';
+import { Config } from './config';
 // import { Stream, Readable } from 'stream';
 // import { delay } from './delay';
 
@@ -55,7 +56,7 @@ export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
   logger.info('Starting backup upload');
   const promisifedStream = new PromisifiedReadableStream(fileStream);
   const partsEtag = [];
-  while (true) { // eslint-disable-line
+  while (true) {
     const chunkSize = getChunkSize(partsEtag.length);
     promisifedStream.setSize(chunkSize);
     logger.debug('Waiting for chunk', { partCount: partsEtag.length, size: chunkSize });
@@ -88,4 +89,63 @@ export const getBucketInfo = async ({
     Bucket: s3bucket,
   }).promise();
   return bucketInfo;
+};
+
+export const initMultipartUpload = async (filename, config: Config) => {
+  const s3 = new S3({
+    accessKeyId: config.s3accessKeyId,
+    secretAccessKey: config.s3secretAccessKey,
+    signatureVersion: 'v4',
+    region: config.s3region,
+  });
+  const { UploadId } = await s3.createMultipartUpload({
+    Bucket: config.s3bucket,
+    Key: filename,
+    ContentType: 'application/octet-stream',
+  }).promise();
+  return UploadId;
+};
+
+export const getUploadPartUrlFromLocalCredentials = async (
+  {
+    uploadId, filename, partNumber, partHash,
+  }, config: Config,
+) => {
+  const s3 = new S3({
+    accessKeyId: config.s3accessKeyId,
+    secretAccessKey: config.s3secretAccessKey,
+    signatureVersion: 'v4',
+    region: config.s3region,
+  });
+  return s3.getSignedUrl('uploadPart', {
+    Bucket: config.s3bucket,
+    Key: filename,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+    ContentMD5: partHash,
+  });
+};
+
+export const completeMultipartUpload = async ({
+  filename,
+  uploadId,
+  partsEtag,
+}, config: Config) => {
+  const s3 = new S3({
+    accessKeyId: config.s3accessKeyId,
+    secretAccessKey: config.s3secretAccessKey,
+    signatureVersion: 'v4',
+    region: config.s3region,
+  });
+  return await s3.completeMultipartUpload({
+    Bucket: config.s3bucket,
+    Key: filename,
+    UploadId: uploadId,
+    MultipartUpload: {
+      Parts: partsEtag.map((etag, i) => ({
+        PartNumber: i + 1,
+        ETag: etag,
+      })),
+    },
+  }).promise();
 };

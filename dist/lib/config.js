@@ -15,6 +15,7 @@ const log_1 = require("./log");
 const dbStats_1 = require("./dbStats");
 const s3_1 = require("./s3");
 const helpers_1 = require("./helpers");
+const writeFileAsync = util_1.promisify(fs_1.writeFile);
 var DB_TYPE;
 (function (DB_TYPE) {
     DB_TYPE["pg"] = "pg";
@@ -34,14 +35,22 @@ const configFields = [
         required: true,
     },
     { name: 'agentId', desc: 'Server name', default: `${os_1.hostname()}-${randomstring.generate(4)}` },
-    { name: 'configDirectory', desc: 'Configuration directory', default: '/etc/dbacked' },
-    { name: 'dumpProgramsDirectory', desc: 'Database dumper and restorer download location', default: '/tmp/dbacked_dumpers' },
     {
+        name: 'configDirectory',
+        doNotAsk: true,
+        desc: 'Configuration directory',
+        default: '/etc/dbacked',
+    }, {
+        name: 'dumpProgramsDirectory',
+        doNotAsk: true,
+        desc: 'Database dumper and restorer download location',
+        default: '/tmp/dbacked_dumpers',
+    }, {
         name: 'apikey',
         desc: 'DBacked API key',
         if: ({ subscriptionType }) => subscriptionType === 'premium',
-        validate: async (config) => {
-            dbackedApi_1.registerApiKey(config.apikey);
+        validate: async ({ apikey }) => {
+            dbackedApi_1.registerApiKey(apikey);
             await dbackedApi_1.getProject();
             return true;
         },
@@ -67,8 +76,7 @@ const configFields = [
         desc: 'S3 Bucket',
         if: ({ subscriptionType }) => subscriptionType === 'free',
         required: true,
-        validate: async (config) => {
-            const { s3accessKeyId, s3secretAccessKey, s3region, s3bucket, } = config;
+        validate: async ({ s3accessKeyId, s3secretAccessKey, s3bucket, s3region, }) => {
             try {
                 await s3_1.getBucketInfo({
                     s3accessKeyId, s3secretAccessKey, s3bucket, s3region,
@@ -80,12 +88,55 @@ const configFields = [
             }
         },
     }, {
+        name: 'generateKeyPair',
+        desc: 'Backup encryption key',
+        options: [{
+                value: true, name: 'Generate a new key pair',
+            }, {
+                value: false, name: 'Use an existing public key',
+            }],
+        virtual: true,
+        if: ({ subscriptionType, publicKey }) => !publicKey && subscriptionType === SUBSCRIPTION_TYPE.free,
+    }, {
+        name: 'newKeyPairPassword',
+        desc: 'Private key password',
+        type: 'password',
+        virtual: true,
+        if: (config) => config.generateKeyPair,
+        required: true,
+    }, {
+        name: 'newKeyPairPasswordConfirm',
+        desc: 'Private key password confirm',
+        type: 'password',
+        virtual: true,
+        if: (config) => config.generateKeyPair,
+        required: true,
+        validate: (config) => {
+            if (config.newKeyPairPassword !== config.newKeyPairPasswordConfirm) {
+                return 'Password and confirm do not match';
+            }
+            return true;
+        },
+        transform: async ({ newKeyPairPassword }) => {
+            console.log('Generating key pair, this can take some time...');
+            const keypair = await util_1.promisify(forge.pki.rsa.generateKeyPair)({ bits: 4096, workers: -1 });
+            const publicKeyPem = forge.pki.publicKeyToPem(keypair.publicKey);
+            const privateKeyPem = forge.pki
+                .encryptRsaPrivateKey(keypair.privateKey, newKeyPairPassword);
+            const privateKeyPath = path_1.resolve(process.cwd(), 'dbacked_private_key.pem');
+            await writeFileAsync(privateKeyPath, privateKeyPem);
+            console.log(`Saved private key to: ${privateKeyPath}`);
+            return {
+                publicKey: publicKeyPem,
+            };
+        },
+    }, {
         name: 'publicKey',
         type: 'editor',
         required: true,
         desc: 'RSA Public Key to encrypt the backups',
-        validate: (config) => {
-            const { publicKey } = config;
+        if: (config) => !config.generateKeyPair,
+        validate: ({ publicKey }) => {
             try {
                 forge.pki.publicKeyFromPem(publicKey);
                 return true;
@@ -103,7 +154,7 @@ const configFields = [
             { name: 'MySQL', value: 'mysql' },
             { name: 'MongoDB', value: 'mongodb' },
         ],
-        required: 'true',
+        required: true,
     },
     {
         name: 'dbConnectionString',
@@ -126,11 +177,13 @@ const configFields = [
         name: 'dbName',
         desc: 'Database name',
         required: true,
-        validate: async (config) => {
+        validate: async (config, interactive = false) => {
             try {
                 const databaseBackupableInfo = await dbStats_1.getDatabaseBackupableInfo(config.dbType, config);
-                console.log('\nDBacked will backup these tables: (lines counts are an estimate)');
-                console.log(helpers_1.formatDatabaseBackupableInfo(databaseBackupableInfo));
+                if (interactive) {
+                    console.log('\nDBacked will backup these tables: (lines counts are an estimate)');
+                    console.log(helpers_1.formatDatabaseBackupableInfo(databaseBackupableInfo));
+                }
                 return true;
             }
             catch (e) {
@@ -143,15 +196,23 @@ const configFields = [
         name: 'cron',
         desc: 'When do you want to start the backups? (UTC Cron Expression)',
         if: ({ subscriptionType }) => subscriptionType === 'free',
-        validate: (config) => {
+        validate: ({ cron }) => {
             try {
-                cronParser.parseExpression(config.cron);
+                cronParser.parseExpression(cron);
                 return true;
             }
             catch (e) {
                 return `Error while parsing cron expression: ${e.toString()}`;
             }
         },
+    }, {
+        name: 'daemon',
+        desc: 'Daemonize / Run backup process in background',
+        doNotAsk: true,
+    }, {
+        name: 'daemonName',
+        desc: 'Daemon name, used to run multiple daemon of DBacked at the same time',
+        doNotAsk: true,
     },
 ];
 const readFilePromisified = util_1.promisify(fs_1.readFile);
@@ -163,12 +224,31 @@ exports.getConfigFileContent = async (configDirectory) => {
 // Create a new object from merge of both config object
 const mergeConfigs = (...configs) => {
     // Merge without undefined values
-    return Object.assign({}, ...configs.map((x) => Object.entries(x)
-        .filter(([, value]) => value !== undefined)
-        .reduce((obj, [key, value]) => {
-        obj[key] = value; // eslint-disable-line
-        return obj;
-    }, {})));
+    const res = {};
+    configs.forEach((config) => {
+        configFields.forEach((field) => {
+            if (field.virtual) {
+                return;
+            }
+            if (config[field.name]) {
+                res[field.name] = config[field.name];
+            }
+        });
+    });
+    return res;
+};
+// Create a new object from merge of both config object
+const mergeConfigsWithVirtuals = (...configs) => {
+    // Merge without undefined values
+    const res = {};
+    configs.forEach((config) => {
+        configFields.forEach((field) => {
+            if (config[field.name]) {
+                res[field.name] = config[field.name];
+            }
+        });
+    });
+    return res;
 };
 const mkdirpPromisified = util_1.promisify(mkdirp);
 const writeFilePromisified = util_1.promisify(fs_1.writeFile);
@@ -176,7 +256,7 @@ const saveConfig = async (config) => {
     try {
         await mkdirpPromisified(config.configDirectory);
     }
-    catch (e) { } // eslint-disable-line
+    catch (e) { }
     const filePath = path_1.resolve(config.configDirectory, 'config.json');
     try {
         await writeFilePromisified(filePath, JSON.stringify(config, null, 4));
@@ -186,9 +266,12 @@ const saveConfig = async (config) => {
     }
 };
 const askForConfig = async (inferredConfig) => {
-    const answers = {};
+    let answers = {};
     for (const configField of configFields) {
-        if (configField.if && !configField.if(mergeConfigs(inferredConfig, answers))) {
+        if (configField.doNotAsk) {
+            continue;
+        }
+        if (configField.if && !configField.if(mergeConfigsWithVirtuals(inferredConfig, answers))) {
             continue;
         }
         const answer = await inquirer_1.prompt({
@@ -202,12 +285,15 @@ const askForConfig = async (inferredConfig) => {
                     return 'Required';
                 }
                 if (configField.validate) {
-                    return configField.validate(mergeConfigs(inferredConfig, answers, { [configField.name]: res }));
+                    return configField.validate(mergeConfigsWithVirtuals(inferredConfig, answers, { [configField.name]: res }), true);
                 }
                 return true;
             },
         });
         answers[configField.name] = answer.res;
+        if (configField.transform) {
+            answers = mergeConfigsWithVirtuals(answers, await configField.transform(mergeConfigsWithVirtuals(inferredConfig, answers)));
+        }
     }
     return mergeConfigs(inferredConfig, answers);
 };
@@ -243,7 +329,7 @@ exports.getConfig = async (commandLine, { interactive = false, saveOnDisk = fals
         const configFileContent = await exports.getConfigFileContent(config.configDirectory);
         config = mergeConfigs(config, configFileContent);
     }
-    catch (e) { } // eslint-disable-line
+    catch (e) { }
     // Get config from env variables
     config = mergeConfigs(config, lodash_1.fromPairs(configFields.map(({ name }) => [
         name,

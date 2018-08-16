@@ -6,12 +6,13 @@ import { mkdir } from 'fs';
 import { promisify } from 'util';
 import * as downgradeRoot from 'downgrade-root';
 
-import { getProject, registerApiKey, reportError, waitForBackup } from './dbackedApi';
+import { reportError, waitForNextBackupNeededFromAPI } from './dbackedApi';
 import { delay } from './delay';
 import logger from './log';
-import { getConfig } from './config';
+import { getConfig, SUBSCRIPTION_TYPE } from './config';
+import { initDatabase, waitForNextBackupNeededFromDatabase } from './dbStats';
 
-export const startDatabaseBackupJob = (config, backupInfo) => {
+export const startDatabaseBackupJob = (config, backupInfo = {}) => {
   return new Promise((resolvePromise, reject) => {
     const runner = fork(resolve(__dirname, './backupRunner.js'));
     runner.send(JSON.stringify({
@@ -29,7 +30,7 @@ export const startDatabaseBackupJob = (config, backupInfo) => {
           errorMessageReceived = true;
           reject(payload);
         }
-      } catch (e) {}; // eslint-disable-line
+      } catch (e) {}
     });
     runner.on('exit', (code) => {
       if (code === 0) {
@@ -47,13 +48,10 @@ export const agentLoop = async (commandLineArgs) => {
   const config = await getConfig(commandLineArgs);
 
   logger.info('Agent id:', { agentId: config.agentId });
-  registerApiKey(config.apikey);
-  // Used to test the apiKey before daemonizing
-  // TODO: if ECONREFUSED, try again 5 minutes later
-  await getProject();
-  downgradeRoot();
-  if (commandLineArgs.daemon) {
-    const daemonName = commandLineArgs.daemonName ? `dbacked_${commandLineArgs.daemonName}` : 'dbacked';
+
+  // Daemonize process if needed
+  if (config.daemon) {
+    const daemonName = config.daemonName ? `dbacked_${config.daemonName}` : 'dbacked';
     const lockDir = `/tmp/${daemonName}`;
     try {
       await mkdirPromise(lockDir);
@@ -66,13 +64,26 @@ export const agentLoop = async (commandLineArgs) => {
     daemon();
     await lockfile.lock(lockDir);
   }
+  downgradeRoot();
+
+  if (config.subscriptionType === SUBSCRIPTION_TYPE.free) {
+    await initDatabase(config.dbType, config);
+  }
+
+  // Main loop, blocking until a backup is needed
   while (true) {
     let backupInfo;
     try {
       logger.debug('Waiting for backup job');
-      backupInfo = await waitForBackup(config);
-      logger.debug('Got backup job');
-      await startDatabaseBackupJob(config, backupInfo);
+      if (config.subscriptionType === SUBSCRIPTION_TYPE.premium) {
+        backupInfo = await waitForNextBackupNeededFromAPI(config);
+        logger.debug('Got backup job');
+        await startDatabaseBackupJob(config, backupInfo);
+      } else if (config.subscriptionType === SUBSCRIPTION_TYPE.free) {
+        await waitForNextBackupNeededFromDatabase(config);
+        logger.debug('Got backup job');
+        await startDatabaseBackupJob(config);
+      }
       await delay(5 * 1000);
     } catch (e) {
       logger.error('Error while backuping', { e });

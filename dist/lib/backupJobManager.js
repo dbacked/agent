@@ -11,7 +11,8 @@ const dbackedApi_1 = require("./dbackedApi");
 const delay_1 = require("./delay");
 const log_1 = require("./log");
 const config_1 = require("./config");
-exports.startDatabaseBackupJob = (config, backupInfo) => {
+const dbStats_1 = require("./dbStats");
+exports.startDatabaseBackupJob = (config, backupInfo = {}) => {
     return new Promise((resolvePromise, reject) => {
         const runner = child_process_1.fork(path_1.resolve(__dirname, './backupRunner.js'));
         runner.send(JSON.stringify({
@@ -31,7 +32,6 @@ exports.startDatabaseBackupJob = (config, backupInfo) => {
                 }
             }
             catch (e) { }
-            ; // eslint-disable-line
         });
         runner.on('exit', (code) => {
             if (code === 0) {
@@ -47,13 +47,9 @@ const mkdirPromise = util_1.promisify(fs_1.mkdir);
 exports.agentLoop = async (commandLineArgs) => {
     const config = await config_1.getConfig(commandLineArgs);
     log_1.default.info('Agent id:', { agentId: config.agentId });
-    dbackedApi_1.registerApiKey(config.apikey);
-    // Used to test the apiKey before daemonizing
-    // TODO: if ECONREFUSED, try again 5 minutes later
-    await dbackedApi_1.getProject();
-    downgradeRoot();
-    if (commandLineArgs.daemon) {
-        const daemonName = commandLineArgs.daemonName ? `dbacked_${commandLineArgs.daemonName}` : 'dbacked';
+    // Daemonize process if needed
+    if (config.daemon) {
+        const daemonName = config.daemonName ? `dbacked_${config.daemonName}` : 'dbacked';
         const lockDir = `/tmp/${daemonName}`;
         try {
             await mkdirPromise(lockDir);
@@ -67,13 +63,25 @@ exports.agentLoop = async (commandLineArgs) => {
         daemon();
         await lockfile.lock(lockDir);
     }
+    downgradeRoot();
+    if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
+        await dbStats_1.initDatabase(config.dbType, config);
+    }
+    // Main loop, blocking until a backup is needed
     while (true) {
         let backupInfo;
         try {
             log_1.default.debug('Waiting for backup job');
-            backupInfo = await dbackedApi_1.waitForBackup(config);
-            log_1.default.debug('Got backup job');
-            await exports.startDatabaseBackupJob(config, backupInfo);
+            if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium) {
+                backupInfo = await dbackedApi_1.waitForNextBackupNeededFromAPI(config);
+                log_1.default.debug('Got backup job');
+                await exports.startDatabaseBackupJob(config, backupInfo);
+            }
+            else if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
+                await dbStats_1.waitForNextBackupNeededFromDatabase(config);
+                log_1.default.debug('Got backup job');
+                await exports.startDatabaseBackupJob(config);
+            }
             await delay_1.delay(5 * 1000);
         }
         catch (e) {

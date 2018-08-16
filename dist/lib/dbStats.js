@@ -1,12 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const uuidv4 = require("uuid/v4");
+const lodash_1 = require("lodash");
 const pg_1 = require("pg");
 const mysql_1 = require("mysql");
 const mongodb_1 = require("mongodb");
 const util_1 = require("util");
+const luxon_1 = require("luxon");
+const cronParser = require("cron-parser");
+const delay_1 = require("./delay");
 const databaseTypes = {
     pg: {
-        getDatabaseBackupableInfo: async (connectionInfo) => {
+        createClient: (connectionInfo) => {
             const client = new pg_1.Client({
                 host: connectionInfo.dbHost,
                 port: connectionInfo.dbPort ? Number(connectionInfo.dbPort) : undefined,
@@ -15,6 +20,10 @@ const databaseTypes = {
                 password: connectionInfo.dbPassword,
             });
             client.connect();
+            return client;
+        },
+        getDatabaseBackupableInfo: async (connectionInfo) => {
+            const client = databaseTypes.pg.createClient(connectionInfo);
             const info = await client.query(`SELECT
         relname as name, reltuples as "lineCount"
         FROM pg_class C
@@ -25,6 +34,28 @@ const databaseTypes = {
         ORDER BY reltuples DESC;
       `);
             return info.rows;
+        },
+        initDatabase: async (connectionInfo) => {
+            // If the database is already initiated, this will do nothing
+            const client = databaseTypes.pg.createClient(connectionInfo);
+            await client.query(`
+        CREATE TABLE IF NOT EXISTS dbacked (
+          key text PRIMARY KEY,
+          value text
+        );
+      `);
+            await client.query(`
+        INSERT INTO dbacked (key, value)
+        VALUES ('dbId', $1)
+        ON CONFLICT (key) DO NOTHING
+      `, [uuidv4()]);
+        },
+        getDatabaseBackupStatus: async (connectionInfo) => {
+            const client = databaseTypes.pg.createClient(connectionInfo);
+            const info = await client.query(`
+        SELECT * from dbacked;
+      `);
+            return lodash_1.fromPairs(info.rows.map(({ key, value }) => [key, value]));
         },
     },
     mysql: {
@@ -59,4 +90,22 @@ const databaseTypes = {
     },
 };
 exports.getDatabaseBackupableInfo = async (dbType, connectionInfo) => databaseTypes[dbType].getDatabaseBackupableInfo(connectionInfo);
+exports.initDatabase = async (dbType, connectionInfo) => databaseTypes[dbType].initDatabase(connectionInfo);
+exports.getDatabaseBackupStatus = async (dbType, connectionInfo) => databaseTypes[dbType].getDatabaseBackupStatus(connectionInfo);
+const isBackupNeeded = async (config) => {
+    const backupStatus = await exports.getDatabaseBackupStatus(config.dbType, config);
+    const lastBackupDate = luxon_1.DateTime.fromMillis(backupStatus.lastBackupDate || 0).toUTC();
+    const cronExpression = cronParser.parseExpression(config.cron, { utc: true });
+    const idealPreviousCronDate = luxon_1.DateTime.fromJSDate(cronExpression.prev().toDate()).toUTC();
+    return lastBackupDate.diff(idealPreviousCronDate).as('minutes') < 0;
+};
+exports.waitForNextBackupNeededFromDatabase = async (config) => {
+    while (true) {
+        if (await isBackupNeeded(config)) {
+            return true;
+        }
+        // If no backup needed, wait 4 minutes and try again
+        await delay_1.delay(1000 * 60 * 5);
+    }
+};
 //# sourceMappingURL=dbStats.js.map

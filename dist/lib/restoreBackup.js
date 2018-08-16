@@ -66,7 +66,9 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
     else {
         assertExit_1.default(false, 'No private key was provided by --private-key-path or DBACKED_PRIVATE_KEY env');
     }
-    if (privateKey.split('\n')[1] === 'Proc-Type: 4,ENCRYPTED') {
+    // TODO:
+    if (privateKey.split('\n')[1] === 'Proc-Type: 4,ENCRYPTED' ||
+        privateKey.split('\n')[0] === '-----BEGIN ENCRYPTED PRIVATE KEY-----') {
         const { passphrase } = await inquirer_1.prompt([{
                 type: 'input',
                 name: 'passphrase',
@@ -97,17 +99,22 @@ exports.restoreBackup = async (commandLine) => {
         useStdin: commandLine.rawInput,
     });
     const promisifiedBackupStream = new streamToPromise_1.default(backupStream);
+    // Test Magic
     promisifiedBackupStream.setSize(7);
     assertExit_1.default((await promisifiedBackupStream.next()).value.toString() === 'DBACKED', 'Invalid start of file, check for file corruption');
+    // Get version
     promisifiedBackupStream.setSize(3);
     const version = [...(await promisifiedBackupStream.next()).value]; // eslint-disable-line
     promisifiedBackupStream.setSize(4);
+    // Get AES key length
     const aesKeyLengthBuffer = (await promisifiedBackupStream.next()).value;
     const [aesKeyLength] = new Uint32Array(aesKeyLengthBuffer.buffer.slice(aesKeyLengthBuffer.byteOffset, aesKeyLengthBuffer.byteOffset + 4));
+    // Get AES key
     promisifiedBackupStream.setSize(aesKeyLength);
     const encryptedAesKey = (await promisifiedBackupStream.next()).value;
     assertExit_1.default(encryptedAesKey && encryptedAesKey.length === aesKeyLength, 'File ends before reading aes key, no aes key header, is file truncated?');
     const decryptedAesKey = await decryptAesKey(commandLine, encryptedAesKey);
+    // Get IV
     promisifiedBackupStream.setSize(16);
     const iv = (await promisifiedBackupStream.next()).value;
     assertExit_1.default(iv && iv.length === 16, 'No IV header, is file truncated?');

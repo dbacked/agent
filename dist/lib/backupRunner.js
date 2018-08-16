@@ -8,27 +8,24 @@ const dbDumpProgram_1 = require("./dbDumpProgram");
 const dbDumper_1 = require("./dbDumper");
 const s3_1 = require("./s3");
 const constants_1 = require("./constants");
+const config_1 = require("./config");
+const luxon_1 = require("luxon");
 let backup;
 log_1.default.debug('Backup worker starting');
 exports.backupDatabase = async (config, backupInfo) => {
     try {
-        dbackedApi_1.registerApiKey(config.apikey);
-        // Used to test the apiKey before daemonizing
-        // TODO: if ECONREFUSED, try again 5 minutes later
-        const project = await dbackedApi_1.getProject();
-        if (!config.publicKey) {
-            config.publicKey = project.publicKey;
-        }
-        backup = backupInfo.backup;
-        // TODO test for mysql
+        backup = backupInfo.backup || {};
         await dbDumpProgram_1.checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
         const hash = crypto_1.createHash('md5');
+        // key is the unique AES key, encrypted key is this AES key encrypted with the RSA public key
         const { key: backupKey, encryptedKey } = await dbDumper_1.createBackupKey(config.publicKey);
+        // IV is the initiation vector of the AES algorithm
         const { backupStream, iv } = await dbDumper_1.startDumper(backupKey, config);
         log_1.default.debug('Creating backup file stream PassThrough');
         const backupFileStream = new stream_1.PassThrough({
             highWaterMark: 201 * 1024 * 1024,
         });
+        // Magic bytes used to verify Backup file
         backupFileStream.write(Buffer.from('DBACKED'));
         backupFileStream.write(Buffer.from([...constants_1.VERSION]));
         backupFileStream.write(Buffer.from((new Uint32Array([encryptedKey.length])).buffer));
@@ -41,25 +38,49 @@ exports.backupDatabase = async (config, backupInfo) => {
         });
         backupFileStream.pipe(uploadingStream);
         backupFileStream.pipe(hash);
+        if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
+            backup.filename = `backup_${config.dbName}_${luxon_1.DateTime.utc().toFormat('ddLLyyyyHHmm')}`;
+            backup.s3uploadId = await s3_1.initMultipartUpload(backup.filename, config);
+        }
         const partsEtag = await s3_1.uploadToS3({
             fileStream: uploadingStream,
             generateBackupUrl: async ({ partNumber, partHash }) => {
                 log_1.default.debug('Getting multipart upload URL for part number', { partNumber });
-                const { partUploadUrl } = await dbackedApi_1.getUploadPartUrl({
-                    backup, partNumber, agentId: config.agentId, hash: partHash,
-                });
-                return partUploadUrl;
+                if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium) {
+                    const { partUploadUrl } = await dbackedApi_1.getUploadPartUrl({
+                        backup, partNumber, agentId: config.agentId, hash: partHash,
+                    });
+                    return partUploadUrl;
+                }
+                return s3_1.getUploadPartUrlFromLocalCredentials({
+                    filename: backup.filename,
+                    uploadId: backup.s3uploadId,
+                    partNumber,
+                    partHash,
+                }, config);
             },
         });
         log_1.default.info('Informing server the upload is finished');
         hash.end();
-        await dbackedApi_1.finishUpload({
-            backup,
-            partsEtag,
-            hash: hash.read().toString('hex'),
-            agentId: config.agentId,
-            publicKey: config.publicKey,
-        });
+        if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium) {
+            await dbackedApi_1.finishUpload({
+                backup,
+                partsEtag,
+                hash: hash.read().toString('hex'),
+                agentId: config.agentId,
+                publicKey: config.publicKey,
+            });
+        }
+        else if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
+            await s3_1.completeMultipartUpload({
+                filename: backup.filename,
+                uploadId: backup.s3uploadId,
+                partsEtag,
+            }, config);
+            // TODO: save last backup date in db
+            // TODO: save a JSON file in s3 containing: dbType, hash, size, publicKey
+            // TODO: send beacon to DBacked API
+        }
         log_1.default.info('backup finished !');
         process.exit(0);
     }

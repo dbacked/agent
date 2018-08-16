@@ -65,7 +65,10 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
   } else {
     assertExit(false, 'No private key was provided by --private-key-path or DBACKED_PRIVATE_KEY env');
   }
-  if (privateKey.split('\n')[1] === 'Proc-Type: 4,ENCRYPTED') {
+  // TODO:
+  if (privateKey.split('\n')[1] === 'Proc-Type: 4,ENCRYPTED' ||
+    privateKey.split('\n')[0] === '-----BEGIN ENCRYPTED PRIVATE KEY-----'
+  ) {
     const { passphrase } = <any> await prompt([{
       type: 'input',
       name: 'passphrase',
@@ -97,24 +100,31 @@ export const restoreBackup = async (commandLine) => {
     useStdin: commandLine.rawInput,
   });
   const promisifiedBackupStream = new PromisifiedReadableStream(backupStream);
+
+  // Test Magic
   promisifiedBackupStream.setSize(7);
   assertExit((await promisifiedBackupStream.next()).value.toString() === 'DBACKED', 'Invalid start of file, check for file corruption');
+  // Get version
   promisifiedBackupStream.setSize(3);
   const version = [...(await promisifiedBackupStream.next()).value]; // eslint-disable-line
   promisifiedBackupStream.setSize(4);
+  // Get AES key length
   const aesKeyLengthBuffer = <Buffer>(await promisifiedBackupStream.next()).value;
   const [aesKeyLength] = new Uint32Array(aesKeyLengthBuffer.buffer.slice(
     aesKeyLengthBuffer.byteOffset,
     aesKeyLengthBuffer.byteOffset + 4,
   ));
+  // Get AES key
   promisifiedBackupStream.setSize(aesKeyLength);
   const encryptedAesKey = <Buffer> (await promisifiedBackupStream.next()).value;
   assertExit(encryptedAesKey && encryptedAesKey.length === aesKeyLength, 'File ends before reading aes key, no aes key header, is file truncated?');
   const decryptedAesKey = await decryptAesKey(commandLine, encryptedAesKey);
+  // Get IV
   promisifiedBackupStream.setSize(16);
   const iv = <Buffer> (await promisifiedBackupStream.next()).value;
   assertExit(iv && iv.length === 16, 'No IV header, is file truncated?');
   const decipher = createDecipheriv('aes256', decryptedAesKey, iv);
+
   backupStream.pipe(decipher);
   const gunzip = createGunzip();
   decipher.pipe(gunzip);

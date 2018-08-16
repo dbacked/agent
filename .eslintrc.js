@@ -19,7 +19,10 @@ module.exports = {
       "import/first": 0,
       "global-require": 0,
       "no-restricted-syntax": 0,
-      "no-continue": 0
+      "no-continue": 0,
+      "no-empty": ["error", { "allowEmptyCatch": true }],
+      "no-constant-condition": ["error", { "checkLoops": false }],
+      "no-return-await": 0
   },
   "plugins": [
       "typescript",

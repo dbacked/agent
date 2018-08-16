@@ -48,12 +48,14 @@
     "proper-lockfile": "^3.0.2",
     "randomstring": "^1.1.5",
     "unzip-stream": "^0.3.0",
+    "uuid": "^3.3.2",
     "winston": "^3.0.0",
     "yargs": "^11.0.0"
   },
   "devDependencies": {
     "@types/inquirer": "0.0.42",
     "@types/lodash": "^4.14.116",
+    "@types/luxon": "^1.2.2",
     "@types/node": "^10.1.4",
     "@types/node-forge": "^0.7.4",
     "@types/pg": "^7.4.10",
