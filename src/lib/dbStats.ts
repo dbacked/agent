@@ -1,5 +1,5 @@
 import * as uuidv4 from 'uuid/v4';
-import { fromPairs } from 'lodash';
+import { fromPairs, map } from 'lodash';
 import { Client } from 'pg';
 import { createConnection } from 'mysql';
 import { MongoClient } from 'mongodb';
@@ -66,6 +66,14 @@ const databaseTypes = {
       `);
       return fromPairs(info.rows.map(({ key, value }) => [key, value]));
     },
+    saveBackupStatus: async (status, connectionInfo: DB_CONNECTION_INFO) => {
+      const client = databaseTypes.pg.createClient(connectionInfo);
+      await Promise.all(map(status, (val, key) => client.query(`
+        INSERT INTO dbacked (key, value)
+        VALUES ($1, $2)
+        ON CONFLICT (key) DO UPDATE SET value = $2;
+      `, [key, val])));
+    },
   },
   mysql: {
     getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {
@@ -124,6 +132,9 @@ const isBackupNeeded = async (config: Config) => {
   const idealPreviousCronDate = DateTime.fromJSDate(cronExpression.prev().toDate()).toUTC();
   return lastBackupDate.diff(idealPreviousCronDate).as('minutes') < 0;
 };
+
+export const saveBackupStatus = async (dbType, status, connectionInfo: DB_CONNECTION_INFO) =>
+  databaseTypes[dbType].saveBackupStatus(status, connectionInfo);
 
 export const waitForNextBackupNeededFromDatabase = async (config: Config) => {
   while (true) {

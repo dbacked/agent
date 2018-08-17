@@ -57,6 +57,14 @@ const databaseTypes = {
       `);
             return lodash_1.fromPairs(info.rows.map(({ key, value }) => [key, value]));
         },
+        saveBackupStatus: async (status, connectionInfo) => {
+            const client = databaseTypes.pg.createClient(connectionInfo);
+            await Promise.all(lodash_1.map(status, (val, key) => client.query(`
+        INSERT INTO dbacked (key, value)
+        VALUES ($1, $2)
+        ON CONFLICT (key) DO UPDATE SET value = $2;
+      `, [key, val])));
+        },
     },
     mysql: {
         getDatabaseBackupableInfo: async (connectionInfo) => {
@@ -99,6 +107,7 @@ const isBackupNeeded = async (config) => {
     const idealPreviousCronDate = luxon_1.DateTime.fromJSDate(cronExpression.prev().toDate()).toUTC();
     return lastBackupDate.diff(idealPreviousCronDate).as('minutes') < 0;
 };
+exports.saveBackupStatus = async (dbType, status, connectionInfo) => databaseTypes[dbType].saveBackupStatus(status, connectionInfo);
 exports.waitForNextBackupNeededFromDatabase = async (config) => {
     while (true) {
         if (await isBackupNeeded(config)) {

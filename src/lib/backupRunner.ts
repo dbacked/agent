@@ -5,10 +5,11 @@ import { getUploadPartUrl, finishUpload } from './dbackedApi';
 import logger from './log';
 import { checkDbDumpProgram } from './dbDumpProgram';
 import { startDumper, createBackupKey } from './dbDumper';
-import { uploadToS3, initMultipartUpload, getUploadPartUrlFromLocalCredentials, completeMultipartUpload } from './s3';
+import { uploadToS3, initMultipartUpload, getUploadPartUrlFromLocalCredentials, completeMultipartUpload, saveBackupMetadataOnS3 } from './s3';
 import { VERSION } from './constants';
 import { Config, SUBSCRIPTION_TYPE } from './config';
 import { DateTime } from 'luxon';
+import { saveBackupStatus } from './dbStats';
 
 let backup;
 
@@ -45,7 +46,8 @@ export const backupDatabase = async (config: Config, backupInfo) => {
 
 
     if (config.subscriptionType === SUBSCRIPTION_TYPE.free) {
-      backup.filename = `backup_${config.dbName}_${DateTime.utc().toFormat('ddLLyyyyHHmm')}`;
+      backup.date = DateTime.utc();
+      backup.filename = `backup_${config.dbName}_${backup.date.toFormat('ddLLyyyyHHmm')}`;
       backup.s3uploadId = await initMultipartUpload(backup.filename, config);
     }
 
@@ -83,8 +85,16 @@ export const backupDatabase = async (config: Config, backupInfo) => {
         uploadId: backup.s3uploadId,
         partsEtag,
       }, config);
-      // TODO: save last backup date in db
-      // TODO: save a JSON file in s3 containing: dbType, hash, size, publicKey
+      await saveBackupStatus(config.dbType, { lastBackupDate: DateTime.utc().toMillis() }, config);
+      await saveBackupMetadataOnS3({
+        filename: backup.filename,
+        hash: (<any>hash.read()).toString('hex'),
+        publicKey: config.publicKey,
+        agentId: config.agentId,
+        timestamp: backup.date.toMillis(),
+        dbType: config.dbType,
+        dbName: config.dbName,
+      }, config);
       // TODO: send beacon to DBacked API
     }
     logger.info('backup finished !');

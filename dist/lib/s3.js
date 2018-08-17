@@ -133,4 +133,17 @@ exports.completeMultipartUpload = async ({ filename, uploadId, partsEtag, }, con
         },
     }).promise();
 };
+exports.saveBackupMetadataOnS3 = async (metadata, config) => {
+    const s3 = new aws_sdk_1.S3({
+        accessKeyId: config.s3accessKeyId,
+        secretAccessKey: config.s3secretAccessKey,
+        signatureVersion: 'v4',
+        region: config.s3region,
+    });
+    await s3.putObject({
+        Bucket: config.s3bucket,
+        Body: JSON.stringify(metadata, null, 4),
+        Key: `${metadata.filename}_metadata`,
+    }).promise();
+};
 //# sourceMappingURL=s3.js.map
