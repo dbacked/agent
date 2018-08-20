@@ -5,20 +5,19 @@ import { getUploadPartUrl, finishUpload, sendBackupBeacon, sendAnalytics } from 
 import logger from './log';
 import { checkDbDumpProgram } from './dbDumpProgram';
 import { startDumper, createBackupKey } from './dbDumper';
-import { uploadToS3, initMultipartUpload, getUploadPartUrlFromLocalCredentials, completeMultipartUpload, saveBackupMetadataOnS3 } from './s3';
+import { uploadToS3, initMultipartUpload, getUploadPartUrlFromLocalCredentials, completeMultipartUpload, saveBackupMetadataOnS3, abortMultipartUpload } from './s3';
 import { VERSION } from './constants';
 import { Config, SUBSCRIPTION_TYPE } from './config';
 import { DateTime } from 'luxon';
 import { saveBackupStatus } from './dbStats';
 import { getDbNaming } from './helpers';
 
-let backup;
 
 logger.debug('Backup worker starting');
 export const backupDatabase = async (config: Config, backupInfo) => {
+  const backup = backupInfo.backup || {};
+  const backupStartDate = new Date();
   try {
-    const backupStartDate = new Date();
-    backup = backupInfo.backup || {};
     await checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
     const hash = createHash('md5');
 
@@ -112,6 +111,12 @@ export const backupDatabase = async (config: Config, backupInfo) => {
       type: 'error',
       payload: `${JSON.stringify(e.code || (e.response && e.response.data) || e.message)}\n${e.stack}`,
     }));
+    if (config.subscriptionType === SUBSCRIPTION_TYPE.free) {
+      await abortMultipartUpload({
+        filename: backup.filename,
+        uploadId: backup.s3uploadId,
+      }, config);
+    }
   }
 };
 

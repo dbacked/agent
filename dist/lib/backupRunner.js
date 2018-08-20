@@ -12,12 +12,11 @@ const config_1 = require("./config");
 const luxon_1 = require("luxon");
 const dbStats_1 = require("./dbStats");
 const helpers_1 = require("./helpers");
-let backup;
 log_1.default.debug('Backup worker starting');
 exports.backupDatabase = async (config, backupInfo) => {
+    const backup = backupInfo.backup || {};
+    const backupStartDate = new Date();
     try {
-        const backupStartDate = new Date();
-        backup = backupInfo.backup || {};
         await dbDumpProgram_1.checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
         const hash = crypto_1.createHash('md5');
         // key is the unique AES key, encrypted key is this AES key encrypted with the RSA public key
@@ -107,6 +106,12 @@ exports.backupDatabase = async (config, backupInfo) => {
             type: 'error',
             payload: `${JSON.stringify(e.code || (e.response && e.response.data) || e.message)}\n${e.stack}`,
         }));
+        if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
+            await s3_1.abortMultipartUpload({
+                filename: backup.filename,
+                uploadId: backup.s3uploadId,
+            }, config);
+        }
     }
 };
 process.on('message', (message) => {

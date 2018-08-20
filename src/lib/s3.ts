@@ -78,28 +78,25 @@ export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
   return { partsEtag, totalLength };
 };
 
-export const getBucketInfo = async ({
-  s3accessKeyId, s3secretAccessKey, s3region, s3bucket,
-}) => {
-  const s3 = new S3({
-    accessKeyId: s3accessKeyId,
-    secretAccessKey: s3secretAccessKey,
-    signatureVersion: 'v4',
-    region: s3region,
-  });
-  const bucketInfo = s3.headBucket({
-    Bucket: s3bucket,
-  }).promise();
-  return bucketInfo;
-};
-
-export const initMultipartUpload = async (filename, config: Config) => {
-  const s3 = new S3({
+function createS3api(config: Config) {
+  return new S3({
     accessKeyId: config.s3accessKeyId,
     secretAccessKey: config.s3secretAccessKey,
     signatureVersion: 'v4',
     region: config.s3region,
   });
+}
+
+export const getBucketInfo = async (config) => {
+  const s3 = createS3api(config);
+  const bucketInfo = s3.headBucket({
+    Bucket: config.s3bucket,
+  }).promise();
+  return bucketInfo;
+};
+
+export const initMultipartUpload = async (filename, config: Config) => {
+  const s3 = createS3api(config);
   const { UploadId } = await s3.createMultipartUpload({
     Bucket: config.s3bucket,
     Key: filename,
@@ -108,17 +105,21 @@ export const initMultipartUpload = async (filename, config: Config) => {
   return UploadId;
 };
 
+export const abortMultipartUpload = async ({ uploadId, filename }, config: Config) => {
+  const s3 = createS3api(config);
+  return s3.abortMultipartUpload({
+    Bucket: config.s3bucket,
+    Key: filename,
+    UploadId: uploadId,
+  });
+};
+
 export const getUploadPartUrlFromLocalCredentials = async (
   {
     uploadId, filename, partNumber, partHash,
   }, config: Config,
 ) => {
-  const s3 = new S3({
-    accessKeyId: config.s3accessKeyId,
-    secretAccessKey: config.s3secretAccessKey,
-    signatureVersion: 'v4',
-    region: config.s3region,
-  });
+  const s3 = createS3api(config);
   return s3.getSignedUrl('uploadPart', {
     Bucket: config.s3bucket,
     Key: filename,
@@ -133,12 +134,7 @@ export const completeMultipartUpload = async ({
   uploadId,
   partsEtag,
 }, config: Config) => {
-  const s3 = new S3({
-    accessKeyId: config.s3accessKeyId,
-    secretAccessKey: config.s3secretAccessKey,
-    signatureVersion: 'v4',
-    region: config.s3region,
-  });
+  const s3 = createS3api(config);
   return await s3.completeMultipartUpload({
     Bucket: config.s3bucket,
     Key: filename,
@@ -153,12 +149,7 @@ export const completeMultipartUpload = async ({
 };
 
 export const saveBackupMetadataOnS3 = async (metadata, config: Config) => {
-  const s3 = new S3({
-    accessKeyId: config.s3accessKeyId,
-    secretAccessKey: config.s3secretAccessKey,
-    signatureVersion: 'v4',
-    region: config.s3region,
-  });
+  const s3 = createS3api(config);
   await s3.putObject({
     Bucket: config.s3bucket,
     Body: JSON.stringify(metadata, null, 4),
