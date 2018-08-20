@@ -3,7 +3,8 @@ import axios, { AxiosInstance } from 'axios';
 import { API_ROOT, VERSION } from './constants';
 import { delay } from './delay';
 import logger from './log';
-import { Config, SUBSCRIPTION_TYPE } from './config';
+import { Config } from './config';
+import { getDatabaseBackupStatus } from './dbStats';
 
 let api: AxiosInstance;
 
@@ -99,3 +100,31 @@ export const getBackupDownloadUrl = async (backup) => {
   return data.downloadUrl;
 };
 
+export const sendBackupBeacon = async (config: Config) => {
+  if (!config.email) {
+    return;
+  }
+  const { dbId } = await getDatabaseBackupStatus(config.dbType, config);
+  await axios.put(`${API_ROOT}/backupChecks`, {
+    dbId,
+    email: config.email,
+    version: VERSION.join('.'),
+    cron: config.cron,
+  });
+};
+
+export const sendAnalytics = async (config: Config, { timing, size }) => {
+  if (!config.sendAnalytics) {
+    return;
+  }
+  await axios.put(`${API_ROOT}/backupAnalytics`, {
+    dbType: config.dbType,
+    version: VERSION.join('.'),
+    cron: config.cron,
+    usingDumperOptions: !!config.dumperOptions,
+    subscriptionType: config.subscriptionType,
+    databaseIsLocal: config.dbHost === 'localhost' || config.dbHost === '127.0.0.1',
+    size,
+    time: timing,
+  });
+};

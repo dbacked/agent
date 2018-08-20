@@ -56,6 +56,7 @@ export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
   logger.info('Starting backup upload');
   const promisifedStream = new PromisifiedReadableStream(fileStream);
   const partsEtag = [];
+  let totalLength = 0;
   while (true) {
     const chunkSize = getChunkSize(partsEtag.length);
     promisifedStream.setSize(chunkSize);
@@ -71,9 +72,10 @@ export const uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
     const chunkEtag = await uploadChunkToS3({ url, chunk, hash });
     logger.debug('Uploaded chunk', { partCount: partsEtag.length });
     partsEtag.push(chunkEtag);
+    totalLength += chunkSize;
   }
   logger.debug('Finished uploading chunks');
-  return partsEtag;
+  return { partsEtag, totalLength };
 };
 
 export const getBucketInfo = async ({

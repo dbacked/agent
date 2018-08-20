@@ -55,6 +55,16 @@ const configFields = [
             return true;
         },
     }, {
+        name: 'email',
+        desc: 'Email to send an alert to if no backups in 30 days [Optionnal]',
+        if: ({ subscriptionType }) => subscriptionType === 'free',
+        validate: ({ email }) => {
+            if (email && !/\S+@\S+\.\S+/.test(email)) {
+                return 'Invalid email';
+            }
+            return true;
+        },
+    }, {
         name: 's3accessKeyId',
         desc: 'S3 Access Key ID',
         if: ({ subscriptionType }) => subscriptionType === 'free',
@@ -77,6 +87,7 @@ const configFields = [
         if: ({ subscriptionType }) => subscriptionType === 'free',
         required: true,
         validate: async ({ s3accessKeyId, s3secretAccessKey, s3bucket, s3region, }) => {
+            console.log('Testing credentials on S3...');
             try {
                 await s3_1.getBucketInfo({
                     s3accessKeyId, s3secretAccessKey, s3bucket, s3region,
@@ -178,6 +189,7 @@ const configFields = [
         desc: 'Database name',
         required: true,
         validate: async (config, interactive = false) => {
+            console.log('Testing connection to database...');
             try {
                 const databaseBackupableInfo = await dbStats_1.getDatabaseBackupableInfo(config.dbType, config);
                 if (interactive) {
@@ -190,6 +202,10 @@ const configFields = [
                 return `Error while connecting to database: ${e.toString()}`;
             }
         },
+    }, {
+        name: 'dbAlias',
+        desc: 'Database alias (used for backup filename)',
+        if: ({ subscriptionType }) => subscriptionType === 'free',
     },
     { name: 'dumperOptions', desc: 'Command line option to set on pg_dump, mongodump or mysqldump' },
     {
@@ -205,6 +221,12 @@ const configFields = [
                 return `Error while parsing cron expression: ${e.toString()}`;
             }
         },
+    }, {
+        name: 'sendAnalytics',
+        // TODO: link to a page explaining which analytics are being sent
+        desc: 'Authorize DBacked to send anonymized analytics?',
+        if: ({ subscriptionType }) => subscriptionType === 'free',
+        options: [{ name: 'Yes', value: true }, { name: 'No', value: false }],
     }, {
         name: 'daemon',
         desc: 'Daemonize / Run backup process in background',

@@ -27,4 +27,5 @@ exports.formatDatabaseBackupableInfo = (databaseBackupableInfo) => {
     });
     return table.toString();
 };
+exports.getDbNaming = (config) => config.dbAlias || config.dbName;
 //# sourceMappingURL=helpers.js.map

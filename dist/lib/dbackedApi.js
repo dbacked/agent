@@ -4,6 +4,7 @@ const axios_1 = require("axios");
 const constants_1 = require("./constants");
 const delay_1 = require("./delay");
 const log_1 = require("./log");
+const dbStats_1 = require("./dbStats");
 let api;
 exports.registerApiKey = (apikey) => {
     api = axios_1.default.create({
@@ -83,5 +84,32 @@ exports.reportError = async ({ backup, e, agentId, }) => {
 exports.getBackupDownloadUrl = async (backup) => {
     const { data } = await api.get(`projects/${backup.projectId}/backups/${backup.id}/downloadUrl`);
     return data.downloadUrl;
+};
+exports.sendBackupBeacon = async (config) => {
+    if (!config.email) {
+        return;
+    }
+    const { dbId } = await dbStats_1.getDatabaseBackupStatus(config.dbType, config);
+    await axios_1.default.put(`${constants_1.API_ROOT}/backupChecks`, {
+        dbId,
+        email: config.email,
+        version: constants_1.VERSION.join('.'),
+        cron: config.cron,
+    });
+};
+exports.sendAnalytics = async (config, { timing, size }) => {
+    if (!config.sendAnalytics) {
+        return;
+    }
+    await axios_1.default.put(`${constants_1.API_ROOT}/backupAnalytics`, {
+        dbType: config.dbType,
+        version: constants_1.VERSION.join('.'),
+        cron: config.cron,
+        usingDumperOptions: !!config.dumperOptions,
+        subscriptionType: config.subscriptionType,
+        databaseIsLocal: config.dbHost === 'localhost' || config.dbHost === '127.0.0.1',
+        size,
+        time: timing,
+    });
 };
 //# sourceMappingURL=dbackedApi.js.map

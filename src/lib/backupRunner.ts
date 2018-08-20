@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { PassThrough } from 'stream';
 
-import { getUploadPartUrl, finishUpload } from './dbackedApi';
+import { getUploadPartUrl, finishUpload, sendBackupBeacon, sendAnalytics } from './dbackedApi';
 import logger from './log';
 import { checkDbDumpProgram } from './dbDumpProgram';
 import { startDumper, createBackupKey } from './dbDumper';
@@ -10,12 +10,14 @@ import { VERSION } from './constants';
 import { Config, SUBSCRIPTION_TYPE } from './config';
 import { DateTime } from 'luxon';
 import { saveBackupStatus } from './dbStats';
+import { getDbNaming } from './helpers';
 
 let backup;
 
 logger.debug('Backup worker starting');
 export const backupDatabase = async (config: Config, backupInfo) => {
   try {
+    const backupStartDate = new Date();
     backup = backupInfo.backup || {};
     await checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
     const hash = createHash('md5');
@@ -47,11 +49,11 @@ export const backupDatabase = async (config: Config, backupInfo) => {
 
     if (config.subscriptionType === SUBSCRIPTION_TYPE.free) {
       backup.date = DateTime.utc();
-      backup.filename = `backup_${config.dbName}_${backup.date.toFormat('ddLLyyyyHHmm')}`;
+      backup.filename = `backup_${getDbNaming(config)}_${backup.date.toFormat('ddLLyyyyHHmm')}`;
       backup.s3uploadId = await initMultipartUpload(backup.filename, config);
     }
 
-    const partsEtag = await uploadToS3({
+    const { partsEtag, totalLength } = await uploadToS3({
       fileStream: uploadingStream,
       generateBackupUrl: async ({ partNumber, partHash }) => {
         logger.debug('Getting multipart upload URL for part number', { partNumber });
@@ -93,10 +95,15 @@ export const backupDatabase = async (config: Config, backupInfo) => {
         agentId: config.agentId,
         timestamp: backup.date.toMillis(),
         dbType: config.dbType,
-        dbName: config.dbName,
+        dbName: getDbNaming(config),
+        size: totalLength,
       }, config);
-      // TODO: send beacon to DBacked API
+      await sendBackupBeacon(config);
     }
+    await sendAnalytics(config, {
+      timing: (new Date()).getTime() - backupStartDate.getTime(),
+      size: totalLength,
+    });
     logger.info('backup finished !');
     process.exit(0);
   } catch (e) {

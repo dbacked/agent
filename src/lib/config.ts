@@ -53,6 +53,9 @@ export interface Config {
   cron?: string;
   daemon?: boolean;
   daemonName?: boolean;
+  email?: string;
+  dbAlias?: string;
+  sendAnalytics?: boolean;
 }
 
 export interface VirtualConfig extends Config {
@@ -104,6 +107,16 @@ const configFields: ConfigField[] = [
       return true;
     },
   }, {
+    name: 'email',
+    desc: 'Email to send an alert to if no backups in 30 days [Optionnal]',
+    if: ({ subscriptionType }) => subscriptionType === 'free',
+    validate: ({ email }) => {
+      if (email && !/\S+@\S+\.\S+/.test(email)) {
+        return 'Invalid email';
+      }
+      return true;
+    },
+  }, {
     name: 's3accessKeyId',
     desc: 'S3 Access Key ID',
     if: ({ subscriptionType }) => subscriptionType === 'free',
@@ -128,6 +141,7 @@ const configFields: ConfigField[] = [
     validate: async ({
       s3accessKeyId, s3secretAccessKey, s3bucket, s3region,
     }) => {
+      console.log('Testing credentials on S3...');
       try {
         await getBucketInfo({
           s3accessKeyId, s3secretAccessKey, s3bucket, s3region,
@@ -160,10 +174,10 @@ const configFields: ConfigField[] = [
     desc: 'Private key password confirm',
     type: 'password',
     virtual: true,
-    if: (config) => (<any>config).generateKeyPair,
+    if: (config) => config.generateKeyPair,
     required: true,
     validate: (config) => {
-      if ((<any>config).newKeyPairPassword !== (<any>config).newKeyPairPasswordConfirm) {
+      if (config.newKeyPairPassword !== config.newKeyPairPasswordConfirm) {
         return 'Password and confirm do not match';
       }
       return true;
@@ -229,6 +243,7 @@ const configFields: ConfigField[] = [
     desc: 'Database name',
     required: true,
     validate: async (config, interactive = false) => {
+      console.log('Testing connection to database...');
       try {
         const databaseBackupableInfo = await getDatabaseBackupableInfo(config.dbType, config);
         if (interactive) {
@@ -240,6 +255,10 @@ const configFields: ConfigField[] = [
         return `Error while connecting to database: ${e.toString()}`;
       }
     },
+  }, {
+    name: 'dbAlias',
+    desc: 'Database alias (used for backup filename)',
+    if: ({ subscriptionType }) => subscriptionType === 'free',
   },
   { name: 'dumperOptions', desc: 'Command line option to set on pg_dump, mongodump or mysqldump' },
   {
@@ -254,6 +273,12 @@ const configFields: ConfigField[] = [
         return `Error while parsing cron expression: ${e.toString()}`;
       }
     },
+  }, {
+    name: 'sendAnalytics',
+    // TODO: link to a page explaining which analytics are being sent
+    desc: 'Authorize DBacked to send anonymized analytics?',
+    if: ({ subscriptionType }) => subscriptionType === 'free',
+    options: [{ name: 'Yes', value: true }, { name: 'No', value: false }],
   }, {
     name: 'daemon',
     desc: 'Daemonize / Run backup process in background',

@@ -11,10 +11,12 @@ const constants_1 = require("./constants");
 const config_1 = require("./config");
 const luxon_1 = require("luxon");
 const dbStats_1 = require("./dbStats");
+const helpers_1 = require("./helpers");
 let backup;
 log_1.default.debug('Backup worker starting');
 exports.backupDatabase = async (config, backupInfo) => {
     try {
+        const backupStartDate = new Date();
         backup = backupInfo.backup || {};
         await dbDumpProgram_1.checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
         const hash = crypto_1.createHash('md5');
@@ -41,10 +43,10 @@ exports.backupDatabase = async (config, backupInfo) => {
         backupFileStream.pipe(hash);
         if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
             backup.date = luxon_1.DateTime.utc();
-            backup.filename = `backup_${config.dbName}_${backup.date.toFormat('ddLLyyyyHHmm')}`;
+            backup.filename = `backup_${helpers_1.getDbNaming(config)}_${backup.date.toFormat('ddLLyyyyHHmm')}`;
             backup.s3uploadId = await s3_1.initMultipartUpload(backup.filename, config);
         }
-        const partsEtag = await s3_1.uploadToS3({
+        const { partsEtag, totalLength } = await s3_1.uploadToS3({
             fileStream: uploadingStream,
             generateBackupUrl: async ({ partNumber, partHash }) => {
                 log_1.default.debug('Getting multipart upload URL for part number', { partNumber });
@@ -87,10 +89,15 @@ exports.backupDatabase = async (config, backupInfo) => {
                 agentId: config.agentId,
                 timestamp: backup.date.toMillis(),
                 dbType: config.dbType,
-                dbName: config.dbName,
+                dbName: helpers_1.getDbNaming(config),
+                size: totalLength,
             }, config);
-            // TODO: send beacon to DBacked API
+            await dbackedApi_1.sendBackupBeacon(config);
         }
+        await dbackedApi_1.sendAnalytics(config, {
+            timing: (new Date()).getTime() - backupStartDate.getTime(),
+            size: totalLength,
+        });
         log_1.default.info('backup finished !');
         process.exit(0);
     }
