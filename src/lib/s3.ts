@@ -1,6 +1,7 @@
 import Axios from 'axios';
 import { S3 } from 'aws-sdk';
 import { createHash } from 'crypto';
+import { endsWith } from 'lodash';
 
 import logger from './log';
 import { delay } from './delay';
@@ -155,4 +156,38 @@ export const saveBackupMetadataOnS3 = async (metadata, config: Config) => {
     Body: JSON.stringify(metadata, null, 4),
     Key: `${metadata.filename}_metadata`,
   }).promise();
+};
+
+export const getBackupNamesFromS3 = async (config: Config) => {
+  const s3 = createS3api(config);
+  const objects = await s3.listObjectsV2({
+    Bucket: config.s3bucket,
+    Prefix: 'dbacked_',
+  }).promise();
+  return objects.Contents
+    .filter(({ Key }) => !endsWith(Key, '_metadata'))
+    .map(({ Key }) => Key);
+};
+
+export const getBackupMetadataFromS3 = async (config: Config, backupName) => {
+  const s3 = createS3api(config);
+  try {
+    const metadata = await s3.getObject({
+      Bucket: config.s3bucket,
+      Key: `${backupName}_metadata`,
+    }).promise();
+    return JSON.parse(metadata.Body as string);
+  } catch (e) {
+    console.log(`Metadata for backup ${backupName} are invalid`);
+    return null;
+  }
+};
+
+export const getS3downloadUrl = async (config: Config, key) => {
+  const s3 = createS3api(config);
+  return s3.getSignedUrl('getObject', {
+    Bucket: config.s3bucket,
+    Key: key,
+    Expires: 60 * 30,
+  });
 };

@@ -37,14 +37,18 @@ const configFields = [
     { name: 'agentId', desc: 'Server name', default: `${os_1.hostname()}-${randomstring.generate(4)}` },
     {
         name: 'configDirectory',
-        doNotAsk: true,
         desc: 'Configuration directory',
         default: '/etc/dbacked',
+        meta: {
+            doNotAsk: true,
+        },
     }, {
         name: 'dumpProgramsDirectory',
-        doNotAsk: true,
         desc: 'Database dumper and restorer download location',
         default: '/tmp/dbacked_dumpers',
+        meta: {
+            doNotAsk: true,
+        },
     }, {
         name: 'apikey',
         desc: 'DBacked API key',
@@ -63,6 +67,9 @@ const configFields = [
                 return 'Invalid email';
             }
             return true;
+        },
+        meta: {
+            notForRestore: true,
         },
     }, {
         name: 's3accessKeyId',
@@ -86,8 +93,10 @@ const configFields = [
         desc: 'S3 Bucket',
         if: ({ subscriptionType }) => subscriptionType === 'free',
         required: true,
-        validate: async ({ s3accessKeyId, s3secretAccessKey, s3bucket, s3region, }) => {
-            console.log('Testing credentials on S3...');
+        validate: async ({ s3accessKeyId, s3secretAccessKey, s3bucket, s3region, }, interactive = false) => {
+            if (interactive) {
+                console.log('Testing credentials on S3...');
+            }
             try {
                 await s3_1.getBucketInfo({
                     s3accessKeyId, s3secretAccessKey, s3bucket, s3region,
@@ -106,20 +115,25 @@ const configFields = [
             }, {
                 value: false, name: 'Use an existing public key',
             }],
-        virtual: true,
         if: ({ subscriptionType, publicKey }) => !publicKey && subscriptionType === SUBSCRIPTION_TYPE.free,
+        meta: {
+            virtual: true,
+            notForRestore: true,
+        },
     }, {
         name: 'newKeyPairPassword',
         desc: 'Private key password',
         type: 'password',
-        virtual: true,
         if: (config) => config.generateKeyPair,
         required: true,
+        meta: {
+            virtual: true,
+            notForRestore: true,
+        },
     }, {
         name: 'newKeyPairPasswordConfirm',
         desc: 'Private key password confirm',
         type: 'password',
-        virtual: true,
         if: (config) => config.generateKeyPair,
         required: true,
         validate: (config) => {
@@ -141,6 +155,10 @@ const configFields = [
                 publicKey: publicKeyPem,
             };
         },
+        meta: {
+            virtual: true,
+            notForRestore: true,
+        },
     }, {
         name: 'publicKey',
         type: 'editor',
@@ -155,6 +173,9 @@ const configFields = [
             catch (e) {
                 return `Error while testing public key: ${e.toString()}`;
             }
+        },
+        meta: {
+            notForRestore: true,
         },
     },
     {
@@ -189,11 +210,13 @@ const configFields = [
         desc: 'Database name',
         required: true,
         validate: async (config, interactive = false) => {
-            console.log('Testing connection to database...');
+            if (interactive) {
+                console.log('Testing connection to database...');
+            }
             try {
                 const databaseBackupableInfo = await dbStats_1.getDatabaseBackupableInfo(config.dbType, config);
                 if (interactive) {
-                    console.log('\nDBacked will backup these tables: (lines counts are an estimate)');
+                    console.log('\nDatabase content: (lines counts are an estimate)');
                     console.log(helpers_1.formatDatabaseBackupableInfo(databaseBackupableInfo));
                 }
                 return true;
@@ -206,9 +229,16 @@ const configFields = [
         name: 'dbAlias',
         desc: 'Database alias (used for backup filename)',
         if: ({ subscriptionType }) => subscriptionType === 'free',
-    },
-    { name: 'dumperOptions', desc: 'Command line option to set on pg_dump, mongodump or mysqldump' },
-    {
+        meta: {
+            notForRestore: true,
+        },
+    }, {
+        name: 'dumperOptions',
+        desc: 'Command line option to set on pg_dump, mongodump or mysqldump',
+        meta: {
+            notForRestore: true,
+        },
+    }, {
         name: 'cron',
         desc: 'When do you want to start the backups? (UTC Cron Expression)',
         if: ({ subscriptionType }) => subscriptionType === 'free',
@@ -221,20 +251,30 @@ const configFields = [
                 return `Error while parsing cron expression: ${e.toString()}`;
             }
         },
+        meta: {
+            notForRestore: true,
+        },
     }, {
         name: 'sendAnalytics',
         // TODO: link to a page explaining which analytics are being sent
         desc: 'Authorize DBacked to send anonymized analytics?',
         if: ({ subscriptionType }) => subscriptionType === 'free',
         options: [{ name: 'Yes', value: true }, { name: 'No', value: false }],
+        meta: {
+            notForRestore: true,
+        },
     }, {
         name: 'daemon',
         desc: 'Daemonize / Run backup process in background',
-        doNotAsk: true,
+        meta: {
+            doNotAsk: true,
+        },
     }, {
         name: 'daemonName',
         desc: 'Daemon name, used to run multiple daemon of DBacked at the same time',
-        doNotAsk: true,
+        meta: {
+            doNotAsk: true,
+        },
     },
 ];
 const readFilePromisified = util_1.promisify(fs_1.readFile);
@@ -249,7 +289,7 @@ const mergeConfigs = (...configs) => {
     const res = {};
     configs.forEach((config) => {
         configFields.forEach((field) => {
-            if (field.virtual) {
+            if (field.meta && field.meta.virtual) {
                 return;
             }
             if (config[field.name]) {
@@ -287,10 +327,13 @@ const saveConfig = async (config) => {
         log_1.default.error('Couldn\'t save JSON config file', { filePath, error: e.message });
     }
 };
-const askForConfig = async (inferredConfig) => {
+const askForConfig = async (inferredConfig, { filter }) => {
     let answers = {};
     for (const configField of configFields) {
-        if (configField.doNotAsk) {
+        if (configField.meta && configField.meta.doNotAsk) {
+            continue;
+        }
+        if (filter && !filter(configField)) {
             continue;
         }
         if (configField.if && !configField.if(mergeConfigsWithVirtuals(inferredConfig, answers))) {
@@ -319,10 +362,13 @@ const askForConfig = async (inferredConfig) => {
     }
     return mergeConfigs(inferredConfig, answers);
 };
-const checkConfig = async (config) => {
+const checkConfig = async (config, { filter }) => {
     const errors = [];
     for (const configField of configFields) {
         let error;
+        if (filter && !filter(configField)) {
+            continue;
+        }
         if (configField.if && !configField.if(config)) {
             continue;
         }
@@ -343,7 +389,7 @@ const checkConfig = async (config) => {
         throw new Error(errors.join('\n'));
     }
 };
-exports.getConfig = async (commandLine, { interactive = false, saveOnDisk = false } = {}) => {
+exports.getConfig = async (commandLine, { interactive = false, saveOnDisk = false, filter = undefined } = {}) => {
     let config = {
         configDirectory: commandLine.configDirectory || '/etc/dbacked',
     };
@@ -363,9 +409,9 @@ exports.getConfig = async (commandLine, { interactive = false, saveOnDisk = fals
         commandLine[lodash_1.kebabCase(name)],
     ])));
     if (interactive) {
-        config = await askForConfig(config);
+        config = await askForConfig(config, { filter });
     }
-    await checkConfig(config);
+    await checkConfig(config, { filter });
     if (saveOnDisk) {
         await saveConfig(config);
     }

@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import Axios from 'axios';
 import { pki } from 'node-forge';
 
-import { getConfig } from './config';
+import { getConfig, Config, SUBSCRIPTION_TYPE } from './config';
 import { getProject, registerApiKey, getBackupDownloadUrl } from './dbackedApi';
 import logger from './log';
 import { formatBytes } from './helpers';
@@ -14,17 +14,41 @@ import { createGunzip } from 'zlib';
 import { checkDbDumpProgram } from './dbDumpProgram';
 import { restoreDb } from './dbRestoreProgram';
 import PromisifiedReadableStream from './streamToPromise';
+import { getBackupNamesFromS3, getS3downloadUrl, getBackupMetadataFromS3 } from './s3';
 
-const getBackupToRestore = async (config, { useLastBackup }) => {
-  registerApiKey(config.apikey);
-  const project = await getProject();
-  const availableBackups = project.backups.filter(({ finishedAt }) => !!finishedAt);
+const getAvailableBackups = async (config: Config) => {
+  if (config.subscriptionType === SUBSCRIPTION_TYPE.premium) {
+    const project = await getProject();
+    const availableBackups = project.backups
+      .filter(({ finishedAt }) => !!finishedAt);
+    return availableBackups;
+  } else if (config.subscriptionType === SUBSCRIPTION_TYPE.free) {
+    const backupsName = await getBackupNamesFromS3(config);
+    const backupsMetadata = await Promise.all(backupsName.map((backupName) =>
+      getBackupMetadataFromS3(config, backupName)));
+    return backupsMetadata
+      .filter(Boolean)
+      .map(({
+        dbType, timestamp, size, filename,
+      }) => ({
+        dbType,
+        finishedAt: DateTime.fromMillis(timestamp).toISO(),
+        size,
+        filename,
+      }));
+  }
+  return [];
+};
+
+const getTargetBackupDownloadUrl = async (config: Config, { useLastBackup }) => {
+  const availableBackups = await getAvailableBackups(config);
+  console.log(availableBackups);
   if (!availableBackups.length) {
     logger.error('No backup available for this project');
     process.exit(1);
   }
   if (useLastBackup) {
-    return project.backups[0];
+    return await getBackupDownloadUrl(availableBackups[0]);
   }
   const { backup } = <any> await prompt([{
     type: 'list',
@@ -35,18 +59,19 @@ const getBackupToRestore = async (config, { useLastBackup }) => {
       value: backupChoice,
     })),
   }]);
-  return backup;
+  return config.subscriptionType === SUBSCRIPTION_TYPE.premium ?
+    await getBackupDownloadUrl(backup) :
+    await getS3downloadUrl(config, backup.filename);
 };
 
 const getBackupStream = async (config, { useLastBackup, useStdin }) => {
   if (useStdin) {
     return process.stdin;
   }
-  const backup = await getBackupToRestore(config, { useLastBackup });
-  const backupDownloadUrl = await getBackupDownloadUrl(backup);
+  const downloadUrl = await getTargetBackupDownloadUrl(config, { useLastBackup });
   const { data } = await Axios({
     method: 'get',
-    url: backupDownloadUrl,
+    url: downloadUrl,
     responseType: 'stream',
   });
   return data;
@@ -93,7 +118,10 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
 };
 
 export const restoreBackup = async (commandLine) => {
-  const config = await getConfig(commandLine, { interactive: !commandLine.y });
+  const config = await getConfig(commandLine, {
+    interactive: !commandLine.y,
+    filter: ({ meta }) => !meta || !meta.notForRestore,
+  });
 
   const backupStream = await getBackupStream(config, {
     useLastBackup: commandLine.lastBackup,

@@ -48,7 +48,7 @@ export const backupDatabase = async (config: Config, backupInfo) => {
 
     if (config.subscriptionType === SUBSCRIPTION_TYPE.free) {
       backup.date = DateTime.utc();
-      backup.filename = `backup_${getDbNaming(config)}_${backup.date.toFormat('ddLLyyyyHHmm')}`;
+      backup.filename = `dbacked_${getDbNaming(config)}_${backup.date.toFormat('ddLLyyyyHHmm')}`;
       backup.s3uploadId = await initMultipartUpload(backup.filename, config);
     }
 

@@ -42,7 +42,7 @@ exports.backupDatabase = async (config, backupInfo) => {
         backupFileStream.pipe(hash);
         if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
             backup.date = luxon_1.DateTime.utc();
-            backup.filename = `backup_${helpers_1.getDbNaming(config)}_${backup.date.toFormat('ddLLyyyyHHmm')}`;
+            backup.filename = `dbacked_${helpers_1.getDbNaming(config)}_${backup.date.toFormat('ddLLyyyyHHmm')}`;
             backup.s3uploadId = await s3_1.initMultipartUpload(backup.filename, config);
         }
         const { partsEtag, totalLength } = await s3_1.uploadToS3({

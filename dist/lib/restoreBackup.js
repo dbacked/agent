@@ -15,16 +15,37 @@ const zlib_1 = require("zlib");
 const dbDumpProgram_1 = require("./dbDumpProgram");
 const dbRestoreProgram_1 = require("./dbRestoreProgram");
 const streamToPromise_1 = require("./streamToPromise");
-const getBackupToRestore = async (config, { useLastBackup }) => {
-    dbackedApi_1.registerApiKey(config.apikey);
-    const project = await dbackedApi_1.getProject();
-    const availableBackups = project.backups.filter(({ finishedAt }) => !!finishedAt);
+const s3_1 = require("./s3");
+const getAvailableBackups = async (config) => {
+    if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium) {
+        const project = await dbackedApi_1.getProject();
+        const availableBackups = project.backups
+            .filter(({ finishedAt }) => !!finishedAt);
+        return availableBackups;
+    }
+    else if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
+        const backupsName = await s3_1.getBackupNamesFromS3(config);
+        const backupsMetadata = await Promise.all(backupsName.map((backupName) => s3_1.getBackupMetadataFromS3(config, backupName)));
+        return backupsMetadata
+            .filter(Boolean)
+            .map(({ dbType, timestamp, size, filename, }) => ({
+            dbType,
+            finishedAt: luxon_1.DateTime.fromMillis(timestamp).toISO(),
+            size,
+            filename,
+        }));
+    }
+    return [];
+};
+const getTargetBackupDownloadUrl = async (config, { useLastBackup }) => {
+    const availableBackups = await getAvailableBackups(config);
+    console.log(availableBackups);
     if (!availableBackups.length) {
         log_1.default.error('No backup available for this project');
         process.exit(1);
     }
     if (useLastBackup) {
-        return project.backups[0];
+        return await dbackedApi_1.getBackupDownloadUrl(availableBackups[0]);
     }
     const { backup } = await inquirer_1.prompt([{
             type: 'list',
@@ -35,17 +56,18 @@ const getBackupToRestore = async (config, { useLastBackup }) => {
                 value: backupChoice,
             })),
         }]);
-    return backup;
+    return config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium ?
+        await dbackedApi_1.getBackupDownloadUrl(backup) :
+        await s3_1.getS3downloadUrl(config, backup.filename);
 };
 const getBackupStream = async (config, { useLastBackup, useStdin }) => {
     if (useStdin) {
         return process.stdin;
     }
-    const backup = await getBackupToRestore(config, { useLastBackup });
-    const backupDownloadUrl = await dbackedApi_1.getBackupDownloadUrl(backup);
+    const downloadUrl = await getTargetBackupDownloadUrl(config, { useLastBackup });
     const { data } = await axios_1.default({
         method: 'get',
-        url: backupDownloadUrl,
+        url: downloadUrl,
         responseType: 'stream',
     });
     return data;
@@ -93,7 +115,10 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
     }
 };
 exports.restoreBackup = async (commandLine) => {
-    const config = await config_1.getConfig(commandLine, { interactive: !commandLine.y });
+    const config = await config_1.getConfig(commandLine, {
+        interactive: !commandLine.y,
+        filter: ({ meta }) => !meta || !meta.notForRestore,
+    });
     const backupStream = await getBackupStream(config, {
         useLastBackup: commandLine.lastBackup,
         useStdin: commandLine.rawInput,

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("axios");
 const aws_sdk_1 = require("aws-sdk");
 const crypto_1 = require("crypto");
+const lodash_1 = require("lodash");
 const log_1 = require("./log");
 const delay_1 = require("./delay");
 const streamToPromise_1 = require("./streamToPromise");
@@ -138,5 +139,37 @@ exports.saveBackupMetadataOnS3 = async (metadata, config) => {
         Body: JSON.stringify(metadata, null, 4),
         Key: `${metadata.filename}_metadata`,
     }).promise();
+};
+exports.getBackupNamesFromS3 = async (config) => {
+    const s3 = createS3api(config);
+    const objects = await s3.listObjectsV2({
+        Bucket: config.s3bucket,
+        Prefix: 'dbacked_',
+    }).promise();
+    return objects.Contents
+        .filter(({ Key }) => !lodash_1.endsWith(Key, '_metadata'))
+        .map(({ Key }) => Key);
+};
+exports.getBackupMetadataFromS3 = async (config, backupName) => {
+    const s3 = createS3api(config);
+    try {
+        const metadata = await s3.getObject({
+            Bucket: config.s3bucket,
+            Key: `${backupName}_metadata`,
+        }).promise();
+        return JSON.parse(metadata.Body);
+    }
+    catch (e) {
+        console.log(`Metadata for backup ${backupName} are invalid`);
+        return null;
+    }
+};
+exports.getS3downloadUrl = async (config, key) => {
+    const s3 = createS3api(config);
+    return s3.getSignedUrl('getObject', {
+        Bucket: config.s3bucket,
+        Key: key,
+        Expires: 60 * 30,
+    });
 };
 //# sourceMappingURL=s3.js.map
