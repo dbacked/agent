@@ -116,15 +116,44 @@ const databaseTypes = {
         },
     },
     mongodb: {
-        getDatabaseBackupableInfo: async (connectionInfo) => {
+        createClient: async (connectionInfo) => {
             const client = await mongodb_1.MongoClient.connect(connectionInfo.dbConnectionString, { useNewUrlParser: true });
-            const db = client.db(connectionInfo.dbName);
+            return client.db();
+        },
+        getDatabaseBackupableInfo: async (connectionInfo) => {
+            const db = await databaseTypes.mongodb.createClient(connectionInfo);
             const collections = await db.listCollections().toArray();
             return Promise.all(collections.map(async ({ name }) => {
                 const col = db.collection(name);
                 const lineCount = await col.estimatedDocumentCount();
                 return { name, lineCount };
             }));
+        },
+        initDatabase: async (connectionInfo) => {
+            const db = await databaseTypes.mongodb.createClient(connectionInfo);
+            const collection = await db.createCollection('dbacked');
+            await collection.updateOne({
+                k: 'dbId',
+            }, {
+                $setOnInsert: {
+                    v: uuidv4(),
+                },
+            }, { upsert: true });
+        },
+        getDatabaseBackupStatus: async (connectionInfo) => {
+            const db = await databaseTypes.mongodb.createClient(connectionInfo);
+            const info = await db.collection('dbacked').find().toArray();
+            return lodash_1.fromPairs(info.map(({ k, v }) => [k, v]));
+        },
+        saveBackupStatus: async (status, connectionInfo) => {
+            const db = await databaseTypes.mongodb.createClient(connectionInfo);
+            await Promise.all(lodash_1.map(status, (val, key) => db.collection('dbacked').update({
+                k: key,
+            }, {
+                $set: {
+                    v: val,
+                },
+            }, { upsert: true })));
         },
     },
 };

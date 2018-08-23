@@ -125,12 +125,15 @@ const databaseTypes = {
     },
   },
   mongodb: {
-    getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {
+    createClient: async (connectionInfo: DB_CONNECTION_INFO) => {
       const client = await MongoClient.connect(
         connectionInfo.dbConnectionString,
         { useNewUrlParser: true },
       );
-      const db = client.db(connectionInfo.dbName);
+      return client.db();
+    },
+    getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {
+      const db = await databaseTypes.mongodb.createClient(connectionInfo);
       const collections = await db.listCollections().toArray();
       return Promise.all(collections.map(async ({ name }) => {
         const col = db.collection(name);
@@ -138,8 +141,32 @@ const databaseTypes = {
         return { name, lineCount };
       }));
     },
-    // TODO: initDatabase for mongodb
-    // TODO: getDatabaseBackupStatus for mongodb
+    initDatabase: async (connectionInfo: DB_CONNECTION_INFO) => {
+      const db = await databaseTypes.mongodb.createClient(connectionInfo);
+      const collection = await db.createCollection('dbacked');
+      await collection.updateOne({
+        k: 'dbId',
+      }, {
+        $setOnInsert: {
+          v: uuidv4(),
+        },
+      }, { upsert: true });
+    },
+    getDatabaseBackupStatus: async (connectionInfo: DB_CONNECTION_INFO) => {
+      const db = await databaseTypes.mongodb.createClient(connectionInfo);
+      const info = await db.collection('dbacked').find().toArray();
+      return fromPairs(info.map(({ k, v }) => [k, v]));
+    },
+    saveBackupStatus: async (status, connectionInfo: DB_CONNECTION_INFO) => {
+      const db = await databaseTypes.mongodb.createClient(connectionInfo);
+      await Promise.all(map(status, (val, key) => db.collection('dbacked').update({
+        k: key,
+      }, {
+        $set: {
+          v: val,
+        },
+      }, { upsert: true })));
+    },
   },
 };
 

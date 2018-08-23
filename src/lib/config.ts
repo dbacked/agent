@@ -265,6 +265,7 @@ const configFields: ConfigField[] = [
     name: 'dbName',
     desc: 'Database name',
     required: true,
+    if: ({ dbType }) => dbType !== 'mongodb',
     validate: async (config, interactive = false) => {
       if (interactive) {
         console.log('Testing connection to database...');

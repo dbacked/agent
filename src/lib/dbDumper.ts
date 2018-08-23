@@ -5,7 +5,7 @@ import { createCipheriv, randomBytes, publicEncrypt } from 'crypto';
 
 import logger from './log';
 import { Config } from './config';
-import { waitForProcessStart, createProcessWatcher } from './childProcessHelpers';
+import { createProcessWatcher } from './childProcessHelpers';
 import { createGzip } from 'zlib';
 
 const randomBytesPromise = promisify(randomBytes);
@@ -49,19 +49,9 @@ export const startDumper = async (backupKey, config: Config) => {
     },
     mongodb: () => {
       const mongodbArgs = [
-        '--host', config.dbHost,
         '--archive',
+        '--uri', config.dbConnectionString,
       ];
-      if (config.dbName) {
-        mongodbArgs.push('--db');
-        mongodbArgs.push(config.dbName);
-      }
-      if (config.dbUsername && config.dbPassword) {
-        mongodbArgs.push('--username');
-        mongodbArgs.push(config.dbUsername);
-        mongodbArgs.push('--password');
-        mongodbArgs.push(config.dbPassword);
-      }
       // TODO: add additionnal flags from config
       return mongodbArgs;
     },
