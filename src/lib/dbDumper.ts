@@ -5,7 +5,7 @@ import { createCipheriv, randomBytes, publicEncrypt } from 'crypto';
 
 import logger from './log';
 import { Config } from './config';
-import { waitForProcessStart } from './waitForProcessStart';
+import { waitForProcessStart, createProcessWatcher } from './childProcessHelpers';
 import { createGzip } from 'zlib';
 
 const randomBytesPromise = promisify(randomBytes);
@@ -26,6 +26,7 @@ export const startDumper = async (backupKey, config: Config) => {
       if (!config.dbPassword) {
         pgArgs.push('--no-password');
       }
+      // TODO: add additionnal flags from config
       pgArgs.push(config.dbName);
       return pgArgs;
     },
@@ -33,6 +34,7 @@ export const startDumper = async (backupKey, config: Config) => {
       const mysqlArgs = [
         '-h', config.dbHost,
         '-C', '--single-transaction',
+        '--column-statistics=0', // https://serverfault.com/questions/912162/mysqldump-throws-unknown-table-column-statistics-in-information-schema-1109
       ];
       if (config.dbUsername) {
         mysqlArgs.push('-u');
@@ -41,6 +43,7 @@ export const startDumper = async (backupKey, config: Config) => {
       if (config.dbPassword) {
         mysqlArgs.push(`--password=${config.dbPassword}`);
       }
+      // TODO: add additionnal flags from config
       mysqlArgs.push(config.dbName);
       return mysqlArgs;
     },
@@ -59,6 +62,7 @@ export const startDumper = async (backupKey, config: Config) => {
         mongodbArgs.push('--password');
         mongodbArgs.push(config.dbPassword);
       }
+      // TODO: add additionnal flags from config
       return mongodbArgs;
     },
   }[config.dbType]();
@@ -76,13 +80,14 @@ export const startDumper = async (backupKey, config: Config) => {
       },
     },
   );
+  const processWatcher = await createProcessWatcher(dumpProcess);
   logger.debug('Started dump process');
 
   dumpProcess.on('close', (code) => {
     logger.debug('Dumper closed', { code });
   });
 
-  await waitForProcessStart(dumpProcess);
+  await processWatcher.waitForStdoutStart();
   logger.debug('Dump process started');
   const gzip = createGzip();
   dumpProcess.stdout.pipe(gzip);
@@ -91,6 +96,7 @@ export const startDumper = async (backupKey, config: Config) => {
   return {
     backupStream: cipher,
     iv,
+    processWatcher,
   };
 };
 

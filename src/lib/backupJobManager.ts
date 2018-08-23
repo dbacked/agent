@@ -86,7 +86,7 @@ export const agentLoop = async (commandLineArgs) => {
       }
       await delay(5 * 1000);
     } catch (e) {
-      logger.error('Error while backuping', { e });
+      logger.error('Error while backing up', { e });
       if (backupInfo) {
         await reportError({
           backup: backupInfo.backup,

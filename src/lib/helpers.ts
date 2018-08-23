@@ -29,4 +29,3 @@ export const formatDatabaseBackupableInfo = (databaseBackupableInfo) => {
 };
 
 export const getDbNaming = (config: Config) => config.dbAlias || config.dbName;
-

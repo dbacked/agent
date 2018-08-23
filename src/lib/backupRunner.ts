@@ -12,7 +12,6 @@ import { DateTime } from 'luxon';
 import { saveBackupStatus } from './dbStats';
 import { getDbNaming } from './helpers';
 
-
 logger.debug('Backup worker starting');
 export const backupDatabase = async (config: Config, backupInfo) => {
   const backup = backupInfo.backup || {};
@@ -24,7 +23,7 @@ export const backupDatabase = async (config: Config, backupInfo) => {
     // key is the unique AES key, encrypted key is this AES key encrypted with the RSA public key
     const { key: backupKey, encryptedKey } = await createBackupKey(config.publicKey);
     // IV is the initiation vector of the AES algorithm
-    const { backupStream, iv } = await startDumper(backupKey, config);
+    const { backupStream, iv, processWatcher } = await startDumper(backupKey, config);
 
     logger.debug('Creating backup file stream PassThrough');
     const backupFileStream = new PassThrough({
@@ -70,6 +69,7 @@ export const backupDatabase = async (config: Config, backupInfo) => {
         }, config);
       },
     });
+    await processWatcher.waitForExit0();
     logger.info('Informing server the upload is finished');
     hash.end();
     if (config.subscriptionType === SUBSCRIPTION_TYPE.premium) {
@@ -107,16 +107,18 @@ export const backupDatabase = async (config: Config, backupInfo) => {
     process.exit(0);
   } catch (e) {
     logger.error('Unknown error while creating backup', { error: e.code || (e.response && e.response.data) || e.message });
+    try {
+      if (config.subscriptionType === SUBSCRIPTION_TYPE.free) {
+        await abortMultipartUpload({
+          filename: backup.filename,
+          uploadId: backup.s3uploadId,
+        }, config);
+      }
+    } catch (err) {}
     process.send(JSON.stringify({
       type: 'error',
       payload: `${JSON.stringify(e.code || (e.response && e.response.data) || e.message)}\n${e.stack}`,
     }));
-    if (config.subscriptionType === SUBSCRIPTION_TYPE.free) {
-      await abortMultipartUpload({
-        filename: backup.filename,
-        uploadId: backup.s3uploadId,
-      }, config);
-    }
   }
 };
 

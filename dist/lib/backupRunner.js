@@ -22,7 +22,7 @@ exports.backupDatabase = async (config, backupInfo) => {
         // key is the unique AES key, encrypted key is this AES key encrypted with the RSA public key
         const { key: backupKey, encryptedKey } = await dbDumper_1.createBackupKey(config.publicKey);
         // IV is the initiation vector of the AES algorithm
-        const { backupStream, iv } = await dbDumper_1.startDumper(backupKey, config);
+        const { backupStream, iv, processWatcher } = await dbDumper_1.startDumper(backupKey, config);
         log_1.default.debug('Creating backup file stream PassThrough');
         const backupFileStream = new stream_1.PassThrough({
             highWaterMark: 201 * 1024 * 1024,
@@ -63,6 +63,7 @@ exports.backupDatabase = async (config, backupInfo) => {
                 }, config);
             },
         });
+        await processWatcher.waitForExit0();
         log_1.default.info('Informing server the upload is finished');
         hash.end();
         if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium) {
@@ -102,16 +103,19 @@ exports.backupDatabase = async (config, backupInfo) => {
     }
     catch (e) {
         log_1.default.error('Unknown error while creating backup', { error: e.code || (e.response && e.response.data) || e.message });
+        try {
+            if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
+                await s3_1.abortMultipartUpload({
+                    filename: backup.filename,
+                    uploadId: backup.s3uploadId,
+                }, config);
+            }
+        }
+        catch (err) { }
         process.send(JSON.stringify({
             type: 'error',
             payload: `${JSON.stringify(e.code || (e.response && e.response.data) || e.message)}\n${e.stack}`,
         }));
-        if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.free) {
-            await s3_1.abortMultipartUpload({
-                filename: backup.filename,
-                uploadId: backup.s3uploadId,
-            }, config);
-        }
     }
 };
 process.on('message', (message) => {

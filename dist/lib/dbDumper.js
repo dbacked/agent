@@ -5,7 +5,7 @@ const path_1 = require("path");
 const util_1 = require("util");
 const crypto_1 = require("crypto");
 const log_1 = require("./log");
-const waitForProcessStart_1 = require("./waitForProcessStart");
+const childProcessHelpers_1 = require("./childProcessHelpers");
 const zlib_1 = require("zlib");
 const randomBytesPromise = util_1.promisify(crypto_1.randomBytes);
 exports.startDumper = async (backupKey, config) => {
@@ -23,6 +23,7 @@ exports.startDumper = async (backupKey, config) => {
             if (!config.dbPassword) {
                 pgArgs.push('--no-password');
             }
+            // TODO: add additionnal flags from config
             pgArgs.push(config.dbName);
             return pgArgs;
         },
@@ -30,6 +31,7 @@ exports.startDumper = async (backupKey, config) => {
             const mysqlArgs = [
                 '-h', config.dbHost,
                 '-C', '--single-transaction',
+                '--column-statistics=0',
             ];
             if (config.dbUsername) {
                 mysqlArgs.push('-u');
@@ -38,6 +40,7 @@ exports.startDumper = async (backupKey, config) => {
             if (config.dbPassword) {
                 mysqlArgs.push(`--password=${config.dbPassword}`);
             }
+            // TODO: add additionnal flags from config
             mysqlArgs.push(config.dbName);
             return mysqlArgs;
         },
@@ -56,6 +59,7 @@ exports.startDumper = async (backupKey, config) => {
                 mongodbArgs.push('--password');
                 mongodbArgs.push(config.dbPassword);
             }
+            // TODO: add additionnal flags from config
             return mongodbArgs;
         },
     }[config.dbType]();
@@ -68,11 +72,12 @@ exports.startDumper = async (backupKey, config) => {
             LD_LIBRARY_PATH: path_1.resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`),
         },
     });
+    const processWatcher = await childProcessHelpers_1.createProcessWatcher(dumpProcess);
     log_1.default.debug('Started dump process');
     dumpProcess.on('close', (code) => {
         log_1.default.debug('Dumper closed', { code });
     });
-    await waitForProcessStart_1.waitForProcessStart(dumpProcess);
+    await processWatcher.waitForStdoutStart();
     log_1.default.debug('Dump process started');
     const gzip = zlib_1.createGzip();
     dumpProcess.stdout.pipe(gzip);
@@ -81,6 +86,7 @@ exports.startDumper = async (backupKey, config) => {
     return {
         backupStream: cipher,
         iv,
+        processWatcher,
     };
 };
 exports.createBackupKey = async (publicKey) => {

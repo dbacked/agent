@@ -49,14 +49,14 @@ const databaseTypes = {
       const client = databaseTypes.pg.createClient(connectionInfo);
       await client.query(`
         CREATE TABLE IF NOT EXISTS dbacked (
-          key text PRIMARY KEY,
-          value text
+          k text PRIMARY KEY,
+          v text
         );
       `);
       await client.query(`
-        INSERT INTO dbacked (key, value)
+        INSERT INTO dbacked (k, v)
         VALUES ('dbId', $1)
-        ON CONFLICT (key) DO NOTHING
+        ON CONFLICT (k) DO NOTHING
       `, [uuidv4()]);
     },
     getDatabaseBackupStatus: async (connectionInfo: DB_CONNECTION_INFO) => {
@@ -64,19 +64,19 @@ const databaseTypes = {
       const info = await client.query(`
         SELECT * from dbacked;
       `);
-      return fromPairs(info.rows.map(({ key, value }) => [key, value]));
+      return fromPairs(info.rows.map(({ k, v }) => [k, v]));
     },
     saveBackupStatus: async (status, connectionInfo: DB_CONNECTION_INFO) => {
       const client = databaseTypes.pg.createClient(connectionInfo);
       await Promise.all(map(status, (val, key) => client.query(`
-        INSERT INTO dbacked (key, value)
+        INSERT INTO dbacked (k, v)
         VALUES ($1, $2)
-        ON CONFLICT (key) DO UPDATE SET value = $2;
+        ON CONFLICT (k) DO UPDATE SET v = $2;
       `, [key, val])));
     },
   },
   mysql: {
-    getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {
+    createClientQuery: (connectionInfo: DB_CONNECTION_INFO) => {
       const client = createConnection({
         host: connectionInfo.dbHost,
         port: connectionInfo.dbPort ? Number(connectionInfo.dbPort) : undefined,
@@ -85,15 +85,44 @@ const databaseTypes = {
         database: connectionInfo.dbName,
       });
       client.connect();
-      const res = await promisify(client.query.bind(client))(`
+      return promisify(client.query.bind(client));
+    },
+    getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {
+      const clientQuery = databaseTypes.mysql.createClientQuery(connectionInfo);
+      return clientQuery(`
         SELECT table_name as name, table_rows as "lineCount"
         FROM INFORMATION_SCHEMA.TABLES
         WHERE TABLE_SCHEMA = '${connectionInfo.dbName}';
       `);
-      return res;
     },
-    // TODO: initDatabase for mysql
-    // TODO: getDatabaseBackupStatus for mysql
+    initDatabase: async (connectionInfo: DB_CONNECTION_INFO) => {
+      const clientQuery = databaseTypes.mysql.createClientQuery(connectionInfo);
+      await clientQuery(`
+        CREATE TABLE IF NOT EXISTS dbacked (
+          k VARCHAR(128) UNIQUE NOT NULL,
+          v VARCHAR(255)
+        );
+      `);
+      await clientQuery(`
+        INSERT IGNORE INTO dbacked (k, v)
+        VALUES ('dbId', ?);
+      `, [uuidv4()]);
+    },
+    getDatabaseBackupStatus: async (connectionInfo: DB_CONNECTION_INFO) => {
+      const clientQuery = databaseTypes.mysql.createClientQuery(connectionInfo);
+      const info = await clientQuery(`
+        SELECT * from dbacked;
+      `);
+      return fromPairs(info.map(({ k, v }) => [k, v]));
+    },
+    saveBackupStatus: async (status, connectionInfo: DB_CONNECTION_INFO) => {
+      const clientQuery = databaseTypes.mysql.createClientQuery(connectionInfo);
+      await Promise.all(map(status, (val, key) => clientQuery(`
+        INSERT INTO dbacked (k, v)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE v = ?;
+      `, [key, val, val])));
+    },
   },
   mongodb: {
     getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {

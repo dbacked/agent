@@ -10,6 +10,8 @@ exports.waitForProcessStart = (childProcess) => {
         log_1.default.debug('Listening on dump process close event');
         childProcess.addListener('close', (code) => {
             log_1.default.debug('Child process close event fired', { code, processStderr });
+            // TODO: If code is not 0, set a flag that will be tested before finishing backup
+            // because the dumper can exit with an error in the middle of a backup
             if (code !== 0) {
                 reject(new error_1.DbError(processStderr));
             }

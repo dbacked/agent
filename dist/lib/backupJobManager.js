@@ -85,7 +85,7 @@ exports.agentLoop = async (commandLineArgs) => {
             await delay_1.delay(5 * 1000);
         }
         catch (e) {
-            log_1.default.error('Error while backuping', { e });
+            log_1.default.error('Error while backing up', { e });
             if (backupInfo) {
                 await dbackedApi_1.reportError({
                     backup: backupInfo.backup,
