@@ -1,6 +1,7 @@
 import * as Table from 'cli-table';
 import logger from './log';
 import { Config } from './config';
+import { URL } from 'url';
 
 export function formatBytes(bytes, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
@@ -28,4 +29,13 @@ export const formatDatabaseBackupableInfo = (databaseBackupableInfo) => {
   return table.toString();
 };
 
-export const getDbNaming = (config: Config) => config.dbAlias || config.dbName;
+export const getDbNaming = (config: Config) => {
+  if (config.dbAlias) {
+    return config.dbAlias;
+  }
+  if (config.dbConnectionString) {
+    return (new URL(config.dbConnectionString)).pathname.slice(1);
+  }
+  return config.dbName;
+};
+

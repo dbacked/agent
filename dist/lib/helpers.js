@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const Table = require("cli-table");
 const log_1 = require("./log");
+const url_1 = require("url");
 function formatBytes(bytes, decimals = 2) {
     if (bytes === 0)
         return '0 Bytes';
@@ -27,5 +28,13 @@ exports.formatDatabaseBackupableInfo = (databaseBackupableInfo) => {
     });
     return table.toString();
 };
-exports.getDbNaming = (config) => config.dbAlias || config.dbName;
+exports.getDbNaming = (config) => {
+    if (config.dbAlias) {
+        return config.dbAlias;
+    }
+    if (config.dbConnectionString) {
+        return (new url_1.URL(config.dbConnectionString)).pathname.slice(1);
+    }
+    return config.dbName;
+};
 //# sourceMappingURL=helpers.js.map
