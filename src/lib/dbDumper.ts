@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { resolve } from 'path';
+import { trim } from 'lodash';
 import { promisify } from 'util';
 import { createCipheriv, randomBytes, publicEncrypt } from 'crypto';
 
@@ -9,6 +10,8 @@ import { createProcessWatcher } from './childProcessHelpers';
 import { createGzip } from 'zlib';
 
 const randomBytesPromise = promisify(randomBytes);
+
+const argsStringToArray = (argsString = '') => argsString.split(' ').map(trim).filter(Boolean);
 
 export const startDumper = async (backupKey, config: Config) => {
   logger.debug('Starting dump');
@@ -26,7 +29,8 @@ export const startDumper = async (backupKey, config: Config) => {
       if (!config.dbPassword) {
         pgArgs.push('--no-password');
       }
-      // TODO: add additionnal flags from config
+      const additionnalArgs = argsStringToArray(config.dumperOptions);
+      additionnalArgs.forEach((arg) => pgArgs.push(arg));
       pgArgs.push(config.dbName);
       return pgArgs;
     },
@@ -43,7 +47,8 @@ export const startDumper = async (backupKey, config: Config) => {
       if (config.dbPassword) {
         mysqlArgs.push(`--password=${config.dbPassword}`);
       }
-      // TODO: add additionnal flags from config
+      const additionnalArgs = argsStringToArray(config.dumperOptions);
+      additionnalArgs.forEach((arg) => mysqlArgs.push(arg));
       mysqlArgs.push(config.dbName);
       return mysqlArgs;
     },
@@ -52,7 +57,8 @@ export const startDumper = async (backupKey, config: Config) => {
         '--archive',
         '--uri', config.dbConnectionString,
       ];
-      // TODO: add additionnal flags from config
+      const additionnalArgs = argsStringToArray(config.dumperOptions);
+      additionnalArgs.forEach((arg) => mongodbArgs.push(arg));
       return mongodbArgs;
     },
   }[config.dbType]();

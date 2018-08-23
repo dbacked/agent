@@ -2,12 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const child_process_1 = require("child_process");
 const path_1 = require("path");
+const lodash_1 = require("lodash");
 const util_1 = require("util");
 const crypto_1 = require("crypto");
 const log_1 = require("./log");
 const childProcessHelpers_1 = require("./childProcessHelpers");
 const zlib_1 = require("zlib");
 const randomBytesPromise = util_1.promisify(crypto_1.randomBytes);
+const argsStringToArray = (argsString = '') => argsString.split(' ').map(lodash_1.trim).filter(Boolean);
 exports.startDumper = async (backupKey, config) => {
     log_1.default.debug('Starting dump');
     const args = {
@@ -23,7 +25,8 @@ exports.startDumper = async (backupKey, config) => {
             if (!config.dbPassword) {
                 pgArgs.push('--no-password');
             }
-            // TODO: add additionnal flags from config
+            const additionnalArgs = argsStringToArray(config.dumperOptions);
+            additionnalArgs.forEach((arg) => pgArgs.push(arg));
             pgArgs.push(config.dbName);
             return pgArgs;
         },
@@ -40,7 +43,8 @@ exports.startDumper = async (backupKey, config) => {
             if (config.dbPassword) {
                 mysqlArgs.push(`--password=${config.dbPassword}`);
             }
-            // TODO: add additionnal flags from config
+            const additionnalArgs = argsStringToArray(config.dumperOptions);
+            additionnalArgs.forEach((arg) => mysqlArgs.push(arg));
             mysqlArgs.push(config.dbName);
             return mysqlArgs;
         },
@@ -49,7 +53,8 @@ exports.startDumper = async (backupKey, config) => {
                 '--archive',
                 '--uri', config.dbConnectionString,
             ];
-            // TODO: add additionnal flags from config
+            const additionnalArgs = argsStringToArray(config.dumperOptions);
+            additionnalArgs.forEach((arg) => mongodbArgs.push(arg));
             return mongodbArgs;
         },
     }[config.dbType]();
