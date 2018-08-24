@@ -9,7 +9,9 @@
     "build:bin": "ts-node misc/scripts/build.ts",
     "watch": "nodemon -e ts,tsx --exec 'ts-node' src/index.ts",
     "start:nobuild": "ts-node src/index.ts",
-    "start:build": "tsc && node dist/index.js"
+    "start:build": "tsc && node dist/index.js",
+    "docs:dev": "vuepress dev docs",
+    "docs:build": "vuepress build docs"
   },
   "bin": "dist/index.js",
   "pkg": {
@@ -72,6 +74,7 @@
     "pkg": "^4.3.3",
     "ts-node": "^6.0.5",
     "typescript": "^2.8.4",
-    "typescript-eslint-parser": "^15.0.0"
+    "typescript-eslint-parser": "^15.0.0",
+    "vuepress": "^0.14.2"
   }
 }

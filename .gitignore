@@ -67,3 +67,4 @@ misc/dumpers_build
 dbacked
 dbacked_md5
 aws_credentials_test
+docs/.vuepress/dist
