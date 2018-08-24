@@ -60,11 +60,11 @@ exports.startDumper = async (backupKey, config) => {
     }[config.dbType]();
     const iv = await randomBytesPromise(128 / 8);
     const cipher = crypto_1.createCipheriv('aes256', backupKey, iv);
-    const dumpProcess = await child_process_1.spawn(path_1.resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`, 'dump'), args, {
+    const dumpProcess = await child_process_1.spawn(path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`, 'dump'), args, {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {
             PGPASSWORD: config.dbPassword,
-            LD_LIBRARY_PATH: path_1.resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`),
+            LD_LIBRARY_PATH: path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`),
         },
     });
     const processWatcher = await childProcessHelpers_1.createProcessWatcher(dumpProcess);

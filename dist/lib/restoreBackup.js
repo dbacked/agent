@@ -17,7 +17,7 @@ const dbRestoreProgram_1 = require("./dbRestoreProgram");
 const streamToPromise_1 = require("./streamToPromise");
 const s3_1 = require("./s3");
 const getAvailableBackups = async (config) => {
-    if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium) {
+    if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.pro) {
         const project = await dbackedApi_1.getProject();
         const availableBackups = project.backups
             .filter(({ finishedAt }) => !!finishedAt);
@@ -56,7 +56,7 @@ const getTargetBackupDownloadUrl = async (config, { useLastBackup }) => {
                 value: backupChoice,
             })),
         }]);
-    return config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium ?
+    return config.subscriptionType === config_1.SUBSCRIPTION_TYPE.pro ?
         await dbackedApi_1.getBackupDownloadUrl(backup) :
         await s3_1.getS3downloadUrl(config, backup.filename);
 };
@@ -159,7 +159,7 @@ exports.restoreBackup = async (commandLine) => {
                 }]);
             assertExit_1.default(confirm, 'No confirmation, exiting...');
         }
-        await dbDumpProgram_1.checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
+        await dbDumpProgram_1.checkDbDumpProgram(config.dbType, config.databaseToolsDirectory);
         await dbRestoreProgram_1.restoreDb(gunzip, config);
         console.log('Restored !');
     }

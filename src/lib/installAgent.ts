@@ -63,7 +63,7 @@ export const installAgent = async (commandLine) => {
     await installSystemdService();
   } else {
     console.log('This install program only supports systemd and you are using another init system');
-    console.log('Make sure /usr/local/bin/dbacked is launched at startup');
+    console.log('Make sure "/usr/local/bin/dbacked start-agent" is launched at startup');
   }
 };
 

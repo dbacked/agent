@@ -25,34 +25,35 @@ var DB_TYPE;
 var SUBSCRIPTION_TYPE;
 (function (SUBSCRIPTION_TYPE) {
     SUBSCRIPTION_TYPE["free"] = "free";
-    SUBSCRIPTION_TYPE["premium"] = "premium";
+    SUBSCRIPTION_TYPE["pro"] = "pro";
 })(SUBSCRIPTION_TYPE = exports.SUBSCRIPTION_TYPE || (exports.SUBSCRIPTION_TYPE = {}));
 const configFields = [
     {
         name: 'subscriptionType',
         desc: 'What version of DBacked do you want to use?',
-        options: [{ name: 'DBacked Free', value: 'free' }, { name: 'DBacked Pro', value: 'premium' }],
+        options: [{ name: 'DBacked Free', value: 'free' }, { name: 'DBacked Pro', value: 'pro' }],
         required: true,
+        default: 'free',
     },
     { name: 'agentId', desc: 'Server name', default: `${os_1.hostname()}-${randomstring.generate(4)}` },
     {
-        name: 'configDirectory',
-        desc: 'Configuration directory',
-        default: '/etc/dbacked',
+        name: 'configFilePath',
+        desc: 'Configuration file path',
+        default: '/etc/dbacked/config.json',
         meta: {
             doNotAsk: true,
         },
     }, {
-        name: 'dumpProgramsDirectory',
+        name: 'databaseToolsDirectory',
         desc: 'Database dumper and restorer download location',
-        default: '/tmp/dbacked_dumpers',
+        default: '/tmp/dbacked',
         meta: {
             doNotAsk: true,
         },
     }, {
         name: 'apikey',
         desc: 'DBacked API key',
-        if: ({ subscriptionType }) => subscriptionType === 'premium',
+        if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.pro,
         validate: async ({ apikey }) => {
             dbackedApi_1.registerApiKey(apikey);
             await dbackedApi_1.getProject();
@@ -70,42 +71,6 @@ const configFields = [
         },
         meta: {
             notForRestore: true,
-        },
-    }, {
-        name: 's3accessKeyId',
-        desc: 'S3 Access Key ID',
-        if: ({ subscriptionType }) => subscriptionType === 'free',
-        required: true,
-    }, {
-        name: 's3secretAccessKey',
-        desc: 'S3 Secret Access Key',
-        type: 'password',
-        if: ({ subscriptionType }) => subscriptionType === 'free',
-        required: true,
-    }, {
-        name: 's3region',
-        desc: 'S3 Region',
-        if: ({ subscriptionType }) => subscriptionType === 'free',
-        // TODO: validate region
-        required: true,
-    }, {
-        name: 's3bucket',
-        desc: 'S3 Bucket',
-        if: ({ subscriptionType }) => subscriptionType === 'free',
-        required: true,
-        validate: async ({ s3accessKeyId, s3secretAccessKey, s3bucket, s3region, }, interactive = false) => {
-            if (interactive) {
-                console.log('Testing credentials on S3...');
-            }
-            try {
-                await s3_1.getBucketInfo({
-                    s3accessKeyId, s3secretAccessKey, s3bucket, s3region,
-                });
-                return true;
-            }
-            catch (e) {
-                return `Error from S3: ${e.toString()}`;
-            }
         },
     }, {
         name: 'generateKeyPair',
@@ -177,8 +142,51 @@ const configFields = [
         meta: {
             notForRestore: true,
         },
-    },
-    {
+    }, {
+        name: 's3accessKeyId',
+        desc: 'S3 Access Key ID',
+        if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
+        required: true,
+        envName: 'S3_ACCESS_KEY_ID',
+        argName: 's3-access-key-id',
+    }, {
+        name: 's3secretAccessKey',
+        desc: 'S3 Secret Access Key',
+        envName: 'S3_SECRET_ACCESS_KEY',
+        argName: 's3-secret-access-key',
+        type: 'password',
+        if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
+        required: true,
+    }, {
+        name: 's3region',
+        envName: 'S3_REGION',
+        argName: 's3-regoin',
+        desc: 'S3 Region',
+        if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
+        // TODO: validate region
+        required: true,
+    }, {
+        name: 's3bucket',
+        envName: 'S3_BUCKET',
+        argName: 's3-bucket',
+        desc: 'S3 Bucket',
+        if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
+        required: true,
+        validate: async ({ s3accessKeyId, s3secretAccessKey, s3bucket, s3region, }, interactive = false) => {
+            if (interactive) {
+                console.log('Testing credentials on S3...');
+            }
+            try {
+                await s3_1.getBucketInfo({
+                    s3accessKeyId, s3secretAccessKey, s3bucket, s3region,
+                });
+                return true;
+            }
+            catch (e) {
+                return `Error from S3: ${e.toString()}`;
+            }
+        },
+    }, {
         name: 'dbType',
         desc: 'Database type',
         options: [
@@ -229,7 +237,7 @@ const configFields = [
     }, {
         name: 'dbAlias',
         desc: 'Database alias (used for backup filename)',
-        if: ({ subscriptionType }) => subscriptionType === 'free',
+        if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
         meta: {
             notForRestore: true,
         },
@@ -242,7 +250,7 @@ const configFields = [
     }, {
         name: 'cron',
         desc: 'When do you want to start the backups? (UTC Cron Expression)',
-        if: ({ subscriptionType }) => subscriptionType === 'free',
+        if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
         validate: ({ cron }) => {
             try {
                 cronParser.parseExpression(cron);
@@ -259,7 +267,7 @@ const configFields = [
         name: 'sendAnalytics',
         // TODO: link to a page explaining which analytics are being sent
         desc: 'Authorize DBacked to send anonymized analytics?',
-        if: ({ subscriptionType }) => subscriptionType === 'free',
+        if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
         options: [{ name: 'Yes', value: true }, { name: 'No', value: false }],
         meta: {
             notForRestore: true,
@@ -279,9 +287,8 @@ const configFields = [
     },
 ];
 const readFilePromisified = util_1.promisify(fs_1.readFile);
-exports.getConfigFileContent = async (configDirectory) => {
-    const filePath = path_1.resolve(configDirectory, 'config.json');
-    const fileContent = await readFilePromisified(filePath, { encoding: 'utf-8' });
+exports.getConfigFileContent = async (configFilePath) => {
+    const fileContent = await readFilePromisified(configFilePath, { encoding: 'utf-8' });
     return JSON.parse(fileContent);
 };
 // Create a new object from merge of both config object
@@ -317,15 +324,14 @@ const mkdirpPromisified = util_1.promisify(mkdirp);
 const writeFilePromisified = util_1.promisify(fs_1.writeFile);
 const saveConfig = async (config) => {
     try {
-        await mkdirpPromisified(config.configDirectory);
+        await mkdirpPromisified(path_1.dirname(config.configFilePath));
     }
     catch (e) { }
-    const filePath = path_1.resolve(config.configDirectory, 'config.json');
     try {
-        await writeFilePromisified(filePath, JSON.stringify(config, null, 4));
+        await writeFilePromisified(config.configFilePath, JSON.stringify(config, null, 4));
     }
     catch (e) {
-        log_1.default.error('Couldn\'t save JSON config file', { filePath, error: e.message });
+        log_1.default.error('Couldn\'t save JSON config file', { filePath: config.configFilePath, error: e.message });
     }
 };
 const askForConfig = async (inferredConfig, { filter }) => {
@@ -373,6 +379,10 @@ const checkConfig = async (config, { filter }) => {
         if (configField.if && !configField.if(config)) {
             continue;
         }
+        if (!config[configField.name] && configField.default) {
+            config[configField.name] = configField.default; // eslint-disable-line
+        }
+        // TODO: check that value is in options
         if (configField.required && !config[configField.name]) {
             error = 'Required';
         }
@@ -392,22 +402,22 @@ const checkConfig = async (config, { filter }) => {
 };
 exports.getConfig = async (commandLine, { interactive = false, saveOnDisk = false, filter = undefined } = {}) => {
     let config = {
-        configDirectory: commandLine.configDirectory || '/etc/dbacked',
+        configFilePath: commandLine.configFilePath || '/etc/dbacked/config.json',
     };
     try {
-        const configFileContent = await exports.getConfigFileContent(config.configDirectory);
+        const configFileContent = await exports.getConfigFileContent(config.configFilePath);
         config = mergeConfigs(config, configFileContent);
     }
     catch (e) { }
     // Get config from env variables
-    config = mergeConfigs(config, lodash_1.fromPairs(configFields.map(({ name }) => [
+    config = mergeConfigs(config, lodash_1.fromPairs(configFields.map(({ name, envName }) => [
         name,
-        process.env[`DBACKED_${lodash_1.snakeCase(name).toUpperCase()}`],
+        process.env[`DBACKED_${envName || lodash_1.snakeCase(name).toUpperCase()}`],
     ])));
     // Get config from commandLine
-    config = mergeConfigs(config, lodash_1.fromPairs(configFields.map(({ name }) => [
+    config = mergeConfigs(config, lodash_1.fromPairs(configFields.map(({ name, argName }) => [
         name,
-        commandLine[lodash_1.kebabCase(name)],
+        commandLine[argName || lodash_1.kebabCase(name)],
     ])));
     if (interactive) {
         config = await askForConfig(config, { filter });

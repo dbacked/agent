@@ -63,7 +63,7 @@ exports.installAgent = async (commandLine) => {
     }
     else {
         console.log('This install program only supports systemd and you are using another init system');
-        console.log('Make sure /usr/local/bin/dbacked is launched at startup');
+        console.log('Make sure "/usr/local/bin/dbacked start-agent" is launched at startup');
     }
 };
 //# sourceMappingURL=installAgent.js.map

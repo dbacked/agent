@@ -17,7 +17,7 @@ exports.backupDatabase = async (config, backupInfo) => {
     const backup = backupInfo.backup || {};
     const backupStartDate = new Date();
     try {
-        await dbDumpProgram_1.checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
+        await dbDumpProgram_1.checkDbDumpProgram(config.dbType, config.databaseToolsDirectory);
         const hash = crypto_1.createHash('md5');
         // key is the unique AES key, encrypted key is this AES key encrypted with the RSA public key
         const { key: backupKey, encryptedKey } = await dbDumper_1.createBackupKey(config.publicKey);
@@ -49,7 +49,7 @@ exports.backupDatabase = async (config, backupInfo) => {
             fileStream: uploadingStream,
             generateBackupUrl: async ({ partNumber, partHash }) => {
                 log_1.default.debug('Getting multipart upload URL for part number', { partNumber });
-                if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium) {
+                if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.pro) {
                     const { partUploadUrl } = await dbackedApi_1.getUploadPartUrl({
                         backup, partNumber, agentId: config.agentId, hash: partHash,
                     });
@@ -66,7 +66,7 @@ exports.backupDatabase = async (config, backupInfo) => {
         await processWatcher.waitForExit0();
         log_1.default.info('Informing server the upload is finished');
         hash.end();
-        if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium) {
+        if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.pro) {
             await dbackedApi_1.finishUpload({
                 backup,
                 partsEtag,

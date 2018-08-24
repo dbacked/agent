@@ -42,11 +42,11 @@ exports.restoreDb = async (stream, config) => {
             return mongodbArgs;
         },
     }[config.dbType]();
-    const restoreProcess = await child_process_1.spawn(path_1.resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`, 'restore'), args, {
+    const restoreProcess = await child_process_1.spawn(path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`, 'restore'), args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
             PGPASSWORD: config.dbPassword,
-            LD_LIBRARY_PATH: path_1.resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`),
+            LD_LIBRARY_PATH: path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`),
         },
     });
     stream.pipe(restoreProcess.stdin);

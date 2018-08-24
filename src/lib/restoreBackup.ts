@@ -17,7 +17,7 @@ import PromisifiedReadableStream from './streamToPromise';
 import { getBackupNamesFromS3, getS3downloadUrl, getBackupMetadataFromS3 } from './s3';
 
 const getAvailableBackups = async (config: Config) => {
-  if (config.subscriptionType === SUBSCRIPTION_TYPE.premium) {
+  if (config.subscriptionType === SUBSCRIPTION_TYPE.pro) {
     const project = await getProject();
     const availableBackups = project.backups
       .filter(({ finishedAt }) => !!finishedAt);
@@ -59,7 +59,7 @@ const getTargetBackupDownloadUrl = async (config: Config, { useLastBackup }) => 
       value: backupChoice,
     })),
   }]);
-  return config.subscriptionType === SUBSCRIPTION_TYPE.premium ?
+  return config.subscriptionType === SUBSCRIPTION_TYPE.pro ?
     await getBackupDownloadUrl(backup) :
     await getS3downloadUrl(config, backup.filename);
 };
@@ -167,7 +167,7 @@ export const restoreBackup = async (commandLine) => {
       }]);
       assertExit(confirm, 'No confirmation, exiting...');
     }
-    await checkDbDumpProgram(config.dbType, config.dumpProgramsDirectory);
+    await checkDbDumpProgram(config.dbType, config.databaseToolsDirectory);
     await restoreDb(gunzip, config);
     console.log('Restored !');
   }

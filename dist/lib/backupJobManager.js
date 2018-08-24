@@ -72,7 +72,7 @@ exports.agentLoop = async (commandLineArgs) => {
         let backupInfo;
         try {
             log_1.default.debug('Waiting for backup job');
-            if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.premium) {
+            if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.pro) {
                 backupInfo = await dbackedApi_1.waitForNextBackupNeededFromAPI(config);
                 log_1.default.debug('Got backup job');
                 await exports.startDatabaseBackupJob(config, backupInfo);

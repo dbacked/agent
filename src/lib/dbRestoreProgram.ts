@@ -46,13 +46,13 @@ export const restoreDb = async (stream, config: Config) => {
 
 
   const restoreProcess = await spawn(
-    resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`, 'restore'),
+    resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`, 'restore'),
     args,
     {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         PGPASSWORD: config.dbPassword,
-        LD_LIBRARY_PATH: resolve(config.dumpProgramsDirectory, `${config.dbType}_dumper`),
+        LD_LIBRARY_PATH: resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`),
       },
     },
   );
