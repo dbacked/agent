@@ -1,6 +1,7 @@
 module.exports = {
   title: 'DBacked',
   description: 'The best way to backup and restore your database',
+  base: '/agent/',
   themeConfig: {
     lastUpdated: 'Last Updated',
     displayAllHeaders: true,
