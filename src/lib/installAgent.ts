@@ -65,5 +65,6 @@ export const installAgent = async (commandLine) => {
     console.log('This install program only supports systemd and you are using another init system');
     console.log('Make sure "/usr/local/bin/dbacked start-agent" is launched at startup');
   }
+  console.log('Congratulation! DBacked is now installed!');
 };
 
