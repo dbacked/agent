@@ -28,6 +28,7 @@ const getAvailableBackups = async (config) => {
         const backupsMetadata = await Promise.all(backupsName.map((backupName) => s3_1.getBackupMetadataFromS3(config, backupName)));
         return backupsMetadata
             .filter(Boolean)
+            .sort((backup1, backup2) => backup2.timestamp - backup1.timestamp)
             .map(({ dbType, timestamp, size, filename, }) => ({
             dbType,
             finishedAt: luxon_1.DateTime.fromMillis(timestamp).toISO(),
@@ -39,7 +40,6 @@ const getAvailableBackups = async (config) => {
 };
 const getTargetBackupDownloadUrl = async (config, { useLastBackup }) => {
     const availableBackups = await getAvailableBackups(config);
-    console.log(availableBackups);
     if (!availableBackups.length) {
         log_1.default.error('No backup available for this project');
         process.exit(1);
@@ -160,6 +160,7 @@ exports.restoreBackup = async (commandLine) => {
             assertExit_1.default(confirm, 'No confirmation, exiting...');
         }
         await dbDumpProgram_1.checkDbDumpProgram(config.dbType, config.databaseToolsDirectory);
+        console.log('Restoring backup... This can take a long time');
         await dbRestoreProgram_1.restoreDb(gunzip, config);
         console.log('Restored !');
     }

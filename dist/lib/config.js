@@ -34,9 +34,14 @@ const configFields = [
         options: [{ name: 'DBacked Free', value: 'free' }, { name: 'DBacked Pro', value: 'pro' }],
         required: true,
         default: 'free',
-    },
-    { name: 'agentId', desc: 'Server name', default: `${os_1.hostname()}-${randomstring.generate(4)}` },
-    {
+    }, {
+        name: 'agentId',
+        desc: 'Server name',
+        default: `${os_1.hostname()}-${randomstring.generate(4)}`,
+        meta: {
+            notForRestore: true,
+        },
+    }, {
         name: 'configFilePath',
         desc: 'Configuration file path',
         default: '/etc/dbacked/config.json',

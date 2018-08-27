@@ -37,6 +37,7 @@ yargs
     .version(constants_1.VERSION.join('.'))
     .strict()
     .parse();
+// TODO: add a command to start a backup right now
 process.on('unhandledRejection', (e) => {
     console.error(e);
     process.exit(1);

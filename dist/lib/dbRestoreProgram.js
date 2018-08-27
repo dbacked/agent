@@ -49,6 +49,7 @@ exports.restoreDb = async (stream, config) => {
             LD_LIBRARY_PATH: path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`),
         },
     });
+    // TODO: add a percentage indicator
     stream.pipe(restoreProcess.stdin);
     await new Promise((resolvePromise, reject) => {
         restoreProcess.on('exit', (code) => {
