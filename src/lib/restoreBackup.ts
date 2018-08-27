@@ -28,6 +28,7 @@ const getAvailableBackups = async (config: Config) => {
       getBackupMetadataFromS3(config, backupName)));
     return backupsMetadata
       .filter(Boolean)
+      .sort((backup1, backup2) => backup2.timestamp - backup1.timestamp)
       .map(({
         dbType, timestamp, size, filename,
       }) => ({
@@ -42,7 +43,6 @@ const getAvailableBackups = async (config: Config) => {
 
 const getTargetBackupDownloadUrl = async (config: Config, { useLastBackup }) => {
   const availableBackups = await getAvailableBackups(config);
-  console.log(availableBackups);
   if (!availableBackups.length) {
     logger.error('No backup available for this project');
     process.exit(1);
@@ -168,6 +168,7 @@ export const restoreBackup = async (commandLine) => {
       assertExit(confirm, 'No confirmation, exiting...');
     }
     await checkDbDumpProgram(config.dbType, config.databaseToolsDirectory);
+    console.log('Restoring backup... This can take a long time');
     await restoreDb(gunzip, config);
     console.log('Restored !');
   }
