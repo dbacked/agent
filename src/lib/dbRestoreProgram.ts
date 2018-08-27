@@ -27,19 +27,9 @@ export const restoreDb = async (stream, config: Config) => {
     },
     mongodb: () => {
       const mongodbArgs = [
-        '--host', config.dbHost,
+        '--uri', config.dbConnectionString,
         '--archive',
       ];
-      if (config.dbName) {
-        mongodbArgs.push('--db');
-        mongodbArgs.push(config.dbName);
-      }
-      if (config.dbUsername && config.dbPassword) {
-        mongodbArgs.push('--username');
-        mongodbArgs.push(config.dbUsername);
-        mongodbArgs.push('--password');
-        mongodbArgs.push(config.dbPassword);
-      }
       return mongodbArgs;
     },
   }[config.dbType]();

@@ -88,11 +88,10 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
     else {
         assertExit_1.default(false, 'No private key was provided by --private-key-path or DBACKED_PRIVATE_KEY env');
     }
-    // TODO:
-    if (privateKey.split('\n')[1] === 'Proc-Type: 4,ENCRYPTED' ||
-        privateKey.split('\n')[0] === '-----BEGIN ENCRYPTED PRIVATE KEY-----') {
+    if (privateKey.split('\n')[1].includes('Proc-Type: 4,ENCRYPTED') ||
+        privateKey.split('\n')[0].includes('BEGIN ENCRYPTED PRIVATE KEY')) {
         const { passphrase } = await inquirer_1.prompt([{
-                type: 'input',
+                type: 'password',
                 name: 'passphrase',
                 message: 'Private key passphrase',
             }]);
@@ -155,7 +154,9 @@ exports.restoreBackup = async (commandLine) => {
             const { confirm } = await inquirer_1.prompt([{
                     type: 'confirm',
                     name: 'confirm',
-                    message: `Do you really want to restore the backup on database ${config.dbName} on host ${config.dbHost}`,
+                    message: config.dbType === 'mongodb' ?
+                        `Do you really want to restore the backup on database ${config.dbConnectionString}` :
+                        `Do you really want to restore the backup on database ${config.dbName} on host ${config.dbHost}`,
                 }]);
             assertExit_1.default(confirm, 'No confirmation, exiting...');
         }

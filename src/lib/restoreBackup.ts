@@ -78,7 +78,7 @@ const getBackupStream = async (config, { useLastBackup, useStdin }) => {
 };
 
 const decryptAesKey = async (commandLine, encryptedAesKey) => {
-  let privateKey;
+  let privateKey: string;
   if (commandLine.privateKeyPath) {
     try {
       privateKey = await readFilePromisified(commandLine.privateKeyPath, { encoding: 'utf-8' });
@@ -90,12 +90,11 @@ const decryptAesKey = async (commandLine, encryptedAesKey) => {
   } else {
     assertExit(false, 'No private key was provided by --private-key-path or DBACKED_PRIVATE_KEY env');
   }
-  // TODO:
-  if (privateKey.split('\n')[1] === 'Proc-Type: 4,ENCRYPTED' ||
-    privateKey.split('\n')[0] === '-----BEGIN ENCRYPTED PRIVATE KEY-----'
+  if (privateKey.split('\n')[1].includes('Proc-Type: 4,ENCRYPTED') ||
+    privateKey.split('\n')[0].includes('BEGIN ENCRYPTED PRIVATE KEY')
   ) {
     const { passphrase } = <any> await prompt([{
-      type: 'input',
+      type: 'password',
       name: 'passphrase',
       message: 'Private key passphrase',
     }]);
@@ -163,7 +162,10 @@ export const restoreBackup = async (commandLine) => {
       const { confirm } = <any> await prompt([{
         type: 'confirm',
         name: 'confirm',
-        message: `Do you really want to restore the backup on database ${config.dbName} on host ${config.dbHost}`,
+        message: config.dbType === 'mongodb' ?
+          `Do you really want to restore the backup on database ${config.dbConnectionString}` :
+          `Do you really want to restore the backup on database ${config.dbName} on host ${config.dbHost}`,
+
       }]);
       assertExit(confirm, 'No confirmation, exiting...');
     }
