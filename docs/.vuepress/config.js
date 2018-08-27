@@ -13,6 +13,7 @@ module.exports = {
         children: [
           '',
           'getting-started',
+          'restore',
           'configuration',
           's3-configuration',
           'security',
