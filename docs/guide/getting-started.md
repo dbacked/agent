@@ -18,8 +18,6 @@ If you are using a linux distribution which boot SystemD (like Ubuntu, Debian, F
 
 If you're not using SystemD, you'll need to configure your server to start DBacked at boot. There's multiple way to do it depending on your configuration but you'll need to make sure that `/usr/local/bin/dbacked start-agent` is launched.
 
-<div id="asciinema_container"></div>
-
 <script>
   export default {
     mounted () {
