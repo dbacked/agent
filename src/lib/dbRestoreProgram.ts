@@ -56,6 +56,7 @@ export const restoreDb = async (stream, config: Config) => {
       },
     },
   );
+  // TODO: add a percentage indicator
   stream.pipe(restoreProcess.stdin);
   await new Promise((resolvePromise, reject) => {
     restoreProcess.on('exit', (code) => {
