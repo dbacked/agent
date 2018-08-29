@@ -18,7 +18,8 @@ module.exports = {
           's3-configuration',
           'security',
           'implementation-details',
-          'pro'
+          'pro',
+          'todo'
         ]
       }]
     },
