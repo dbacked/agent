@@ -10,7 +10,7 @@ features:
   details: One line to copy-paste in your terminal to start the interactive install process. No configuration editing needed, everything is asked and tested live.
 - title: Backup but also restore
   details: One command to start the interactive restore process, choose your backup from the list and let DBacked stream it back to your database.
-footer: GNU Licensed | Copyright © 2018-present Guillaume Besson
+footer: GNU AGPLv3
 ---
 
 ## Works with

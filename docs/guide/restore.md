@@ -1,5 +1,11 @@
 # Restore a backup
 
+DBacked doesn't stop at backing up your database, it also takes care of the restore process. It's necessary because the backups created are not plug-and-play with `pg_restore`, `mysqlrestore` or `mongorestore` ([Here's why](implementation-details.html#backup-process)).
+
+The easiest way is to use the `dbacked restore` command. It will use the current config file ([see configuration page](configuration.html)) and fetch the list of available backups from S3 for DBacked Free and DBacked API for the pro version.
+
+You need to specify the private key with the `--private-key-path` argument or the environment variable `DBACKED_PRIVATE_KEY`.
+
 <script>
   export default {
     mounted () {
@@ -88,6 +94,13 @@
 
 <div id="asciicast-3JiHpWmaYpRfT3lKddIAFa0xI"></div>
 
+## Restore specific flags
 
-<!-- TODO: Specify flags -->
-<!-- TODO: add a GIF -->
+DBacked includes multiple restore specific flags to allow you to automate the restore process:
+
+- `--last-backup`: doesn't ask you to choose the backup, uses the last one
+- `--private-key-path`: RSA PEM formatted private key to use to decrypt the backup, can be password protected
+- `--force`: Do not ask for confirmation before restore
+- `--raw-input`: Do not download backup from S3, read from stdin (you need to pipe with something like this `cat backup | dbacked restore --raw-input`)
+- `--raw-output`: Do not pipe in database restore process but output decrypted backup without any DBacked specific formating
+- `-y`: Do not ask for questions during process, only use env variables and arguments
