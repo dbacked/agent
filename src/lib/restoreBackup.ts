@@ -4,7 +4,7 @@ import Axios from 'axios';
 import { pki } from 'node-forge';
 
 import { getConfig, Config, SUBSCRIPTION_TYPE } from './config';
-import { getProject, registerApiKey, getBackupDownloadUrl } from './dbackedApi';
+import { getProject, getBackupDownloadUrl } from './dbackedApi';
 import logger from './log';
 import { formatBytes } from './helpers';
 import assertExit from './assertExit';

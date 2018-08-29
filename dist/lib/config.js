@@ -398,7 +398,9 @@ const checkConfig = async (config, { filter }) => {
             }
         }
         if (error) {
-            errors.push(`Error with '${configField.name}': ${error} (configurable with DBACKED_${lodash_1.snakeCase(configField.name).toUpperCase()} env variable, --${lodash_1.kebabCase(configField.name)} command line arg of ${configField.name} config variable)`);
+            const envName = configField.envName || `DBACKED_${lodash_1.snakeCase(configField.name).toUpperCase()}`;
+            const argName = configField.argName || `--${lodash_1.kebabCase(configField.name)}`;
+            errors.push(`Error with '${configField.name}': ${error} (configurable with ${envName} env variable, ${argName} command line arg of ${configField.name} config variable)`);
         }
     }
     if (errors.length) {
