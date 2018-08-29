@@ -22,7 +22,7 @@
     "url": "git+https://github.com/dbacked/agent.git"
   },
   "author": "Guillaume Besson",
-  "license": "GPL-3.0-only",
+  "license": "AGPL-3.0-or-later",
   "bugs": {
     "url": "https://github.com/dbacked/agent/issues"
   },
