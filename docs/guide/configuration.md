@@ -145,8 +145,8 @@ The access key and secret should have enough privileges to create and list backu
 - **Daemon Name**: Use another name to daemonize the agent, useful when you want multiple instances of DBacked to be daemonized at the same time (for multiple databases)
   - <span class="chip">Optionnal</span> <span class="chip">Only with start-agent command</span>
   - `--daemon-name staging` <span class="chip config-type-cli">CLI</span>
-  - `DBACKED_DAEMON_NAME="stagin"` <span class="chip config-type-env">ENV</span>
-  - `"daemonName": stagin` <span class="chip config-type-cfg">CFG</span>
+  - `DBACKED_DAEMON_NAME="staging"` <span class="chip config-type-env">ENV</span>
+  - `"daemonName": staging` <span class="chip config-type-cfg">CFG</span>
 
 
 <style>
