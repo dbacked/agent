@@ -1,6 +1,6 @@
-<center>
+<p align="center">
   <img src="misc/media/promo.png" width="400">
-</center>
+</p>
 
 DBacked is the "database backup script" killer. It backups your PostgreSQL / MySQL / MongoDB database, encrypt it and stream it on S3. Unlike basic scripts, it also packs the  restore process to get data back from your backups in 30 seconds.
 
