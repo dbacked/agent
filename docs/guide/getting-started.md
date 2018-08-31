@@ -14,7 +14,7 @@ sudo ./dbacked install-agent
 
 This will create the `/etc/dbacked/config.json` file populated with the responses you provided and copy the binary to `/usr/local/bin/dbacked`. This is why running as the superuser is required. Of course, you don't need to execute the agent as a superuser afterwards.
 
-If you are using a linux distribution which boot SystemD (like Ubuntu, Debian, Fedora or ArchLinux), the install process will detect it and create a service to start DBacked at startup.
+If you are using a linux distribution which boots SystemD (like Ubuntu, Debian, Fedora or ArchLinux), the install process will detect it and create a service to start DBacked at startup.
 
 If you're not using SystemD, you'll need to configure your server to start DBacked at boot. There's multiple way to do it depending on your configuration but you'll need to make sure that `/usr/local/bin/dbacked start-agent` is launched.
 

@@ -4,12 +4,13 @@ DBacked can be used without paying anything with its free version. The client is
 
 I also provide a Pro version of DBacked on [dbacked.com](https://dbacked.com) that adds:
 - Web dashboard to create and monitor your backups
+- Scheduling of agents on multiple servers for a single database
 - Email alerts when the backups are 30 minutes late or an error happens
 - No AWS account necessary, the service handle the hosting of your backups
 - Protection against accidental deletion of backups
 - Retention policies to save on hosting cost
 - <span class="chip chip-green">Soon</span> Weekly emails about your database health
-- <span class="chip chip-green">Soon</span> Alerts when the backup size increase or decrease a lot
+- <span class="chip chip-green">Soon</span> Alerts when the backup size increases or decreases a lot
 
 You can get more informations and register on [dbacked.com](https://dbacked.com).
 

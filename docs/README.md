@@ -1,7 +1,7 @@
 ---
 home: true
 heroImage: /icon.svg
-actionText: Get Started for free →
+actionText: Install guide →
 actionLink: /guide/
 features:
 - title: Security first

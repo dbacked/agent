@@ -10,11 +10,11 @@ You'll find more informations on this page about what DBacked does to protect yo
 
 ## Encryption
 
-At the heart of DBacked is the data encryption module. It uses a mix of RSA and AES encryption with a public/private RSA key pair. This means you use a *public* key on your servers, this key can be leaked without problems, and keep the *private* key seprate and use it only when you need to restore a backup.
+At the heart of DBacked is the data encryption module. It uses a mix of RSA and AES encryption with a public/private RSA key pair. This means you use a *public* key on your servers, this key can be leaked without problems, and keep the *private* key separate and use it only when you need to restore a backup.
 
-[RSA](https://en.wikipedia.org/wiki/RSA_(cryptosystem)) is a asymetrical encryption algorithm used everywhere. It's well known and used since 1977 to handle private communication. This algorithm has been inspected many time and is considered safe. The NodeJS implementation of this algorithm is used.
+[RSA](https://en.wikipedia.org/wiki/RSA_(cryptosystem)) is a asymetrical encryption algorithm used everywhere. It's well known and used since 1977 to handle private communication. This algorithm has been inspected many times and is considered safe. The [NodeJS implementation](https://nodejs.org/api/crypto.html) of this algorithm is used.
 
-RSA is not designed to encrypt large files. Most protocols use a mix of RSA and AES. AES is a symetrical encryption, meaning you need the same passphrase to encrypt and decrypt it. What DBacked does is creating a random passphrase for every backup and then encrypting this passphrase with your public key and RSA. This encrypted passphrase is stored at the beginning of the backup file.
+RSA is not designed to encrypt large files. Most protocols use a mix of RSA and AES. AES is a symmetrical encryption, meaning you need the same passphrase to encrypt and decrypt it. What DBacked does is creating a random passphrase for every backup and then encrypting this passphrase with your public key and RSA. This encrypted passphrase is stored at the beginning of the backup file.
 
 This way, your backups are well secured while staying fast to encrypt and decrypt.
 
@@ -24,7 +24,7 @@ When uploading your backups to AWS S3, DBacked will compute and send the backup 
 
 ## Dump program monitoring
 
-Like most backup solutions, DBacked uses `pg_dump`, `mysqldump` and `mongodump`. This programs are monitored during their execution and if an error is detected (exit code different from 0) the backup will be aborted. This prevents backups that will silently fails.
+Like most backup solutions, DBacked uses `pg_dump`, `mysqldump` and `mongodump`. This programs are monitored during their execution and if an error is detected (exit code different from 0) the backup will be aborted. This prevents silently failing backups.
 
 ## Email alerts
 
@@ -32,7 +32,7 @@ DBacked can send you multiple email alerts when errors are detected. If you are 
 
 ## What's sent to DBacked servers?
 
-If you are using DBacked Free, you'll be asked for your email for email alerts. This requires a monitoring of your backups on our servers. To do so, a unique random identifier will be created for your database and will be sent, with the email address provided, on our servers everytime a backup is completed. Nothing in your database will be sent. The DBacked version will also be sent, this will allow me to build feature to send you an alert when you should update your DBacked binary.
+If you are using DBacked Free, you'll be asked for your email for email alerts. This requires a monitoring of your backups on our servers. To do so, a unique random identifier will be created for your database and will be sent, with the email address provided, on our servers everytime a backup is completed. Nothing in your database will be sent. The DBacked version will also be sent, this will allow me to send you an alert when a new version of DBacked will be released.
 
 DBacked will also ask you if you want to send anonymous analytics. This is used to get a better view on how DBacked is used and which improvements I should prioritize. Some informations will be sent everytime a backup finishes:
 - The database used (PostgreSQL, MySQL or MongoDB)
@@ -44,6 +44,6 @@ DBacked will also ask you if you want to send anonymous analytics. This is used 
 - The size of your backup
 - How long was the backup process
 
-This information is anonymous and your IP or anything that could identify you is never stored.
+This information is anonymous and nothing that could identify you is ever stored.
 
 I want to thank everyone sending these informations, it helps me a lot to continue to improve DBacked.
