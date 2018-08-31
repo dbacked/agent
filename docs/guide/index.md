@@ -13,7 +13,7 @@ The compiled version is hosted here: [https://dl.dbacked.com/dbacked](https://dl
 DBacked uses `pg_dump`, `mysqldump` or `mongodump` and includes:
 - Simple install process
 - Interactive configuration
-- No cron tab editing
+- No crontab editing
 - Automatic SystemD service creation (Ubuntu and other)
 - Encryption with a public/private key pair
 - Streaming upload to your own AWS S3 bucket
