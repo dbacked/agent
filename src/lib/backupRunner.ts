@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { PassThrough } from 'stream';
 
-import { getUploadPartUrl, finishUpload, sendBackupBeacon, sendAnalytics } from './dbackedApi';
+import { getUploadPartUrl, finishUpload, sendBackupBeacon, sendAnalytics, registerApiKey } from './dbackedApi';
 import logger from './log';
 import { checkDbDumpProgram } from './dbDumpProgram';
 import { startDumper, createBackupKey } from './dbDumper';
@@ -16,6 +16,9 @@ logger.debug('Backup worker starting');
 export const backupDatabase = async (config: Config, backupInfo) => {
   const backup = backupInfo.backup || {};
   const backupStartDate = new Date();
+  if (config.subscriptionType === SUBSCRIPTION_TYPE.pro) {
+    registerApiKey(config.apikey);
+  }
   try {
     await checkDbDumpProgram(config.dbType, config.databaseToolsDirectory);
     const hash = createHash('md5');
