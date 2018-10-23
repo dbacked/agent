@@ -43,6 +43,7 @@ export const restoreDb = async (stream, config: Config) => {
       env: {
         PGPASSWORD: config.dbPassword,
         LD_LIBRARY_PATH: resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`),
+        PGSSLMODE: 'allow',
       },
     },
   );
