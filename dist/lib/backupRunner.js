@@ -16,6 +16,9 @@ log_1.default.debug('Backup worker starting');
 exports.backupDatabase = async (config, backupInfo) => {
     const backup = backupInfo.backup || {};
     const backupStartDate = new Date();
+    if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.pro) {
+        dbackedApi_1.registerApiKey(config.apikey);
+    }
     try {
         await dbDumpProgram_1.checkDbDumpProgram(config.dbType, config.databaseToolsDirectory);
         const hash = crypto_1.createHash('md5');

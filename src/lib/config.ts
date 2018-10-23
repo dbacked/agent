@@ -222,7 +222,7 @@ const configFields: ConfigField[] = [
   }, {
     name: 's3region',
     envName: 'S3_REGION',
-    argName: 's3-regoin',
+    argName: 's3-region',
     desc: 'S3 Region',
     if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
     // TODO: validate region

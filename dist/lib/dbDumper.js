@@ -62,10 +62,7 @@ exports.startDumper = async (backupKey, config) => {
     const cipher = crypto_1.createCipheriv('aes256', backupKey, iv);
     const dumpProcess = await child_process_1.spawn(path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`, 'dump'), args, {
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: {
-            PGPASSWORD: config.dbPassword,
-            LD_LIBRARY_PATH: path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`),
-        },
+        env: Object.assign({}, process.env, { PGPASSWORD: config.dbPassword, LD_LIBRARY_PATH: path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`) }),
     });
     const processWatcher = await childProcessHelpers_1.createProcessWatcher(dumpProcess);
     log_1.default.debug('Started dump process');
