@@ -62,12 +62,12 @@ The access key and secret should have enough privileges to create and list backu
 - **S3 Access Key ID**:
   - <span class="chip">DBacked FREE</span> <span class="chip">Required</span>
   - `--s3-access-key-id XXXXX` <span class="chip config-type-cli">CLI</span>
-  - `DBACKED_ACCESS_KEY_ID=XXXXX` <span class="chip config-type-env">ENV</span>
+  - `DBACKED_S3_ACCESS_KEY_ID=XXXXX` <span class="chip config-type-env">ENV</span>
   - `"s3accessKeyId": "XXXXX"` <span class="chip config-type-cfg">CFG</span>
 - **S3 Secret Access Key**:
   - <span class="chip">DBacked FREE</span> <span class="chip">Required</span>
   - `--s3-secret-access-key XXXXX` <span class="chip config-type-cli">CLI</span>
-  - `DBACKED_SECRET_ACCESS_KEY=XXXXX` <span class="chip config-type-env">ENV</span>
+  - `DBACKED_S3_SECRET_ACCESS_KEY=XXXXX` <span class="chip config-type-env">ENV</span>
   - `"s3secretAccessKey": "XXXXX"` <span class="chip config-type-cfg">CFG</span>
 - **S3 Region**: Should be a [valid AWS S3 region](https://docs.aws.amazon.com/general/latest/gr/rande.html)
   - <span class="chip">DBacked FREE</span> <span class="chip">Required</span>
@@ -77,7 +77,7 @@ The access key and secret should have enough privileges to create and list backu
 - **S3 Bucket Name**: This bucket needs to be created before
   - <span class="chip">DBacked FREE</span> <span class="chip">Required</span>
   - `--s3-bucket test-bucket` <span class="chip config-type-cli">CLI</span>
-  - `DBACKED_S3_REGION=test-bucket` <span class="chip config-type-env">ENV</span>
+  - `DBACKED_S3_BUCKET=test-bucket` <span class="chip config-type-env">ENV</span>
   - `"s3bucket": "test-bucket"` <span class="chip config-type-cfg">CFG</span>
 
 
@@ -168,15 +168,15 @@ The access key and secret should have enough privileges to create and list backu
   vertical-align: middle;
 }
 .config-type-cli {
-  background-color: #5755d9;
-  color: white;
+  background-color: #5755d9 !important;
+  color: white !important;
 }
 .config-type-env {
-  background-color: #32b643;
-  color: white;
+  background-color: #32b643 !important;
+  color: white !important;
 }
 .config-type-cfg {
-  background-color: #ffb700;
-  color: white;
+  background-color: #ffb700 !important;
+  color: white !important;
 }
 </style>
