@@ -12,7 +12,7 @@ cd dumpers_build
 # bison and flex needed
 git clone https://github.com/postgres/postgres.git --depth 1 tmp/postgres
 cd tmp/postgres
-./configure
+./configure --with-openssl
 cd src/interfaces/libpq
 make
 cd ../../..
