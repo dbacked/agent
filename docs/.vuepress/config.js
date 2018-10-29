@@ -19,6 +19,7 @@ module.exports = {
           'security',
           'implementation-details',
           'pro',
+          'uninstall',
           'todo'
         ]
       }]
