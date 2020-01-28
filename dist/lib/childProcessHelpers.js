@@ -1,7 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const error_1 = require("./error");
-const log_1 = require("./log");
+const log_1 = __importDefault(require("./log"));
 const delay_1 = require("./delay");
 exports.createProcessWatcher = async (childProcess) => {
     let processStderr = '';

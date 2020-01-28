@@ -1,14 +1,24 @@
 "use strict";
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const uuidv4 = require("uuid/v4");
+const cronParser = __importStar(require("cron-parser"));
+const v4_1 = __importDefault(require("uuid/v4"));
 const lodash_1 = require("lodash");
 const pg_1 = require("pg");
-const mysql_1 = require("mysql");
-const mongodb_1 = require("mongodb");
-const util_1 = require("util");
 const luxon_1 = require("luxon");
-const cronParser = require("cron-parser");
+const mongodb_1 = require("mongodb");
+const mysql_1 = require("mysql");
 const delay_1 = require("./delay");
+const util_1 = require("util");
 const databaseTypes = {
     pg: {
         createClient: (connectionInfo) => {
@@ -48,7 +58,7 @@ const databaseTypes = {
         INSERT INTO dbacked (k, v)
         VALUES ('dbId', $1)
         ON CONFLICT (k) DO NOTHING
-      `, [uuidv4()]);
+      `, [v4_1.default()]);
         },
         getDatabaseBackupStatus: async (connectionInfo) => {
             const client = databaseTypes.pg.createClient(connectionInfo);
@@ -97,7 +107,7 @@ const databaseTypes = {
             await clientQuery(`
         INSERT IGNORE INTO dbacked (k, v)
         VALUES ('dbId', ?);
-      `, [uuidv4()]);
+      `, [v4_1.default()]);
         },
         getDatabaseBackupStatus: async (connectionInfo) => {
             const clientQuery = databaseTypes.mysql.createClientQuery(connectionInfo);
@@ -136,13 +146,16 @@ const databaseTypes = {
                 k: 'dbId',
             }, {
                 $setOnInsert: {
-                    v: uuidv4(),
+                    v: v4_1.default(),
                 },
             }, { upsert: true });
         },
         getDatabaseBackupStatus: async (connectionInfo) => {
             const db = await databaseTypes.mongodb.createClient(connectionInfo);
-            const info = await db.collection('dbacked').find().toArray();
+            const info = await db
+                .collection('dbacked')
+                .find()
+                .toArray();
             return lodash_1.fromPairs(info.map(({ k, v }) => [k, v]));
         },
         saveBackupStatus: async (status, connectionInfo) => {

@@ -1,20 +1,23 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const inquirer_1 = require("inquirer");
 const luxon_1 = require("luxon");
-const axios_1 = require("axios");
+const axios_1 = __importDefault(require("axios"));
 const node_forge_1 = require("node-forge");
 const config_1 = require("./config");
 const dbackedApi_1 = require("./dbackedApi");
-const log_1 = require("./log");
+const log_1 = __importDefault(require("./log"));
 const helpers_1 = require("./helpers");
-const assertExit_1 = require("./assertExit");
+const assertExit_1 = __importDefault(require("./assertExit"));
 const fs_1 = require("./fs");
 const crypto_1 = require("crypto");
 const zlib_1 = require("zlib");
 const dbDumpProgram_1 = require("./dbDumpProgram");
 const dbRestoreProgram_1 = require("./dbRestoreProgram");
-const streamToPromise_1 = require("./streamToPromise");
+const streamToPromise_1 = __importDefault(require("./streamToPromise"));
 const s3_1 = require("./s3");
 const getAvailableBackups = async (config) => {
     if (config.subscriptionType === config_1.SUBSCRIPTION_TYPE.pro) {

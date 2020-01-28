@@ -9,12 +9,8 @@
     "noImplicitAny": false,
     "module": "commonjs",
     "moduleResolution": "node",
-    "lib": [
-      "esnext",
-      "es6",
-    ]
+    "esModuleInterop": true,
+    "lib": ["esnext", "es6"]
   },
-  "include": [
-    "src/**/*.ts"
-  ]
+  "include": ["src/**/*.ts"]
 }

@@ -1,13 +1,23 @@
 "use strict";
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const path_1 = require("path");
-const axios_1 = require("axios");
-const unzip = require("unzip-stream");
-const mkdirp = require("mkdirp");
-const util_1 = require("util");
+const unzip = __importStar(require("unzip-stream"));
 const fs_1 = require("./fs");
-const log_1 = require("./log");
-const mkdirpPromisifed = util_1.promisify(mkdirp);
+const axios_1 = __importDefault(require("axios"));
+const log_1 = __importDefault(require("./log"));
+const mkdirp_1 = __importDefault(require("mkdirp"));
+const util_1 = require("util");
+const path_1 = require("path");
+const mkdirpPromisifed = util_1.promisify(mkdirp_1.default);
 const needToDownloadDumpProgram = async (type, dumpProgramDirectory) => {
     log_1.default.debug('Getting dump programs MD5', { path: dumpProgramDirectory });
     await mkdirpPromisifed(dumpProgramDirectory);
@@ -25,7 +35,9 @@ const needToDownloadDumpProgram = async (type, dumpProgramDirectory) => {
 };
 exports.checkDbDumpProgram = async (type, directory) => {
     const dumpProgramDirectory = path_1.resolve(directory, `${type}_dumper`);
-    log_1.default.debug('Testing if db dump program exists at', { path: dumpProgramDirectory });
+    log_1.default.debug('Testing if db dump program exists at', {
+        path: dumpProgramDirectory,
+    });
     if (await needToDownloadDumpProgram(type, dumpProgramDirectory)) {
         log_1.default.debug('Downloading dump programs', { path: dumpProgramDirectory });
         const fileUrl = {

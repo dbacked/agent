@@ -1,10 +1,10 @@
-import { promisify } from 'util';
-import { writeFile, copyFile } from 'fs';
-import * as isRoot from 'is-root';
-import { exec } from 'child_process';
+import { copyFile, writeFile } from 'fs';
 
-import logger from './log';
+import { exec } from 'child_process';
 import { getConfig } from './config';
+import isRoot from 'is-root';
+import logger from './log';
+import { promisify } from 'util';
 
 const writeFilePromisified = promisify(writeFile);
 const copyFilePromisified = promisify(copyFile);
@@ -34,7 +34,9 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 `;
-  logger.info('Saving systemd service file', { path: '/lib/systemd/system/dbacked.service' });
+  logger.info('Saving systemd service file', {
+    path: '/lib/systemd/system/dbacked.service',
+  });
   await writeFilePromisified('/lib/systemd/system/dbacked.service', service);
   logger.info('Activating service');
   await execPromisified('systemctl daemon-reload');
@@ -42,15 +44,22 @@ WantedBy=multi-user.target
   logger.info('Service installed and started');
 };
 
-export const installAgent = async (commandLine) => {
+export const installAgent = async commandLine => {
   if (!isRoot()) {
-    console.error('Should be executed as root to install (as we are creating a systemd service)');
+    console.error(
+      'Should be executed as root to install (as we are creating a systemd service)',
+    );
     process.exit(1);
   }
-  await getConfig(commandLine, { interactive: !commandLine.y, saveOnDisk: true });
+  await getConfig(commandLine, {
+    interactive: !commandLine.y,
+    saveOnDisk: true,
+  });
   let isSystemd = false;
   try {
-    isSystemd = (await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n';
+    isSystemd =
+      (await execPromisified('ps --no-headers -o comm 1')).stdout ===
+      'systemd\n';
   } catch (e) {}
   if (isSystemd) {
     await stopPreviousSystemdService();
@@ -62,9 +71,12 @@ export const installAgent = async (commandLine) => {
   if (isSystemd) {
     await installSystemdService();
   } else {
-    console.log('This install program only supports systemd and you are using another init system');
-    console.log('Make sure "/usr/local/bin/dbacked start-agent" is launched at startup');
+    console.log(
+      'This install program only supports systemd and you are using another init system',
+    );
+    console.log(
+      'Make sure "/usr/local/bin/dbacked start-agent" is launched at startup',
+    );
   }
   console.log('Congratulation! DBacked is now installed!');
 };
-
