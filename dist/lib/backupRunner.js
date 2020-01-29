@@ -1,9 +1,12 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const crypto_1 = require("crypto");
 const stream_1 = require("stream");
 const dbackedApi_1 = require("./dbackedApi");
-const log_1 = require("./log");
+const log_1 = __importDefault(require("./log"));
 const dbDumpProgram_1 = require("./dbDumpProgram");
 const dbDumper_1 = require("./dbDumper");
 const s3_1 = require("./s3");

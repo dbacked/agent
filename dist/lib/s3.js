@@ -1,12 +1,15 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const axios_1 = require("axios");
+const axios_1 = __importDefault(require("axios"));
+const streamToPromise_1 = __importDefault(require("./streamToPromise"));
 const aws_sdk_1 = require("aws-sdk");
 const crypto_1 = require("crypto");
-const lodash_1 = require("lodash");
-const log_1 = require("./log");
 const delay_1 = require("./delay");
-const streamToPromise_1 = require("./streamToPromise");
+const lodash_1 = require("lodash");
+const log_1 = __importDefault(require("./log"));
 // import { Stream, Readable } from 'stream';
 // import { delay } from './delay';
 const uploadChunkToS3 = async ({ url, chunk, hash }, retryCount = 0) => {
@@ -19,15 +22,18 @@ const uploadChunkToS3 = async ({ url, chunk, hash }, retryCount = 0) => {
             headers: {
                 'Content-MD5': hash,
             },
-            transformRequest: [(data, headers) => {
+            transformRequest: [
+                (data, headers) => {
                     delete headers.put['Content-Type']; // eslint-disable-line
                     return data;
-                }],
+                },
+            ],
         });
         return res.headers.etag;
     }
     catch (e) {
-        if (retryCount >= 2) { // already tried 3 times, giving up
+        if (retryCount >= 2) {
+            // already tried 3 times, giving up
             throw e;
         }
         log_1.default.warn('Error while uploading chunk to S3, waiting 10 seconds before trying again', { e: e.message });
@@ -35,7 +41,7 @@ const uploadChunkToS3 = async ({ url, chunk, hash }, retryCount = 0) => {
         return uploadChunkToS3({ url, chunk, hash }, retryCount + 1);
     }
 };
-const getChunkSize = (partCount) => {
+const getChunkSize = partCount => {
     if (partCount < 5) {
         return 5 * 1024 * 1024; // 5MB chunks
     }
@@ -59,15 +65,26 @@ exports.uploadToS3 = async ({ fileStream, generateBackupUrl }) => {
     while (true) {
         const chunkSize = getChunkSize(partsEtag.length);
         promisifedStream.setSize(chunkSize);
-        log_1.default.debug('Waiting for chunk', { partCount: partsEtag.length, size: chunkSize });
+        log_1.default.debug('Waiting for chunk', {
+            partCount: partsEtag.length,
+            size: chunkSize,
+        });
         const { done, value: chunk } = await promisifedStream.next();
         log_1.default.debug('Got chunk', { partCount: partsEtag.length });
         if (!chunk || done) {
             break;
         }
-        const hash = crypto_1.createHash('md5').update(chunk).digest('base64');
-        const url = await generateBackupUrl({ partNumber: partsEtag.length + 1, partHash: hash });
-        log_1.default.debug('Starting uploading chunk', { partCount: partsEtag.length, size: chunk.length });
+        const hash = crypto_1.createHash('md5')
+            .update(chunk)
+            .digest('base64');
+        const url = await generateBackupUrl({
+            partNumber: partsEtag.length + 1,
+            partHash: hash,
+        });
+        log_1.default.debug('Starting uploading chunk', {
+            partCount: partsEtag.length,
+            size: chunk.length,
+        });
         const chunkEtag = await uploadChunkToS3({ url, chunk, hash });
         log_1.default.debug('Uploaded chunk', { partCount: partsEtag.length });
         partsEtag.push(chunkEtag);
@@ -82,22 +99,27 @@ function createS3api(config) {
         secretAccessKey: config.s3secretAccessKey,
         signatureVersion: 'v4',
         region: config.s3region,
+        endpoint: config.storageEndpoint,
     });
 }
 exports.getBucketInfo = async (config) => {
     const s3 = createS3api(config);
-    const bucketInfo = s3.headBucket({
+    const bucketInfo = s3
+        .headBucket({
         Bucket: config.s3bucket,
-    }).promise();
+    })
+        .promise();
     return bucketInfo;
 };
 exports.initMultipartUpload = async (filename, config) => {
     const s3 = createS3api(config);
-    const { UploadId } = await s3.createMultipartUpload({
+    const { UploadId } = await s3
+        .createMultipartUpload({
         Bucket: config.s3bucket,
         Key: filename,
         ContentType: 'application/octet-stream',
-    }).promise();
+    })
+        .promise();
     return UploadId;
 };
 exports.abortMultipartUpload = async ({ uploadId, filename }, config) => {
@@ -108,7 +130,7 @@ exports.abortMultipartUpload = async ({ uploadId, filename }, config) => {
         UploadId: uploadId,
     });
 };
-exports.getUploadPartUrlFromLocalCredentials = async ({ uploadId, filename, partNumber, partHash, }, config) => {
+exports.getUploadPartUrlFromLocalCredentials = async ({ uploadId, filename, partNumber, partHash }, config) => {
     const s3 = createS3api(config);
     return s3.getSignedUrl('uploadPart', {
         Bucket: config.s3bucket,
@@ -118,9 +140,10 @@ exports.getUploadPartUrlFromLocalCredentials = async ({ uploadId, filename, part
         ContentMD5: partHash,
     });
 };
-exports.completeMultipartUpload = async ({ filename, uploadId, partsEtag, }, config) => {
+exports.completeMultipartUpload = async ({ filename, uploadId, partsEtag }, config) => {
     const s3 = createS3api(config);
-    return await s3.completeMultipartUpload({
+    return await s3
+        .completeMultipartUpload({
         Bucket: config.s3bucket,
         Key: filename,
         UploadId: uploadId,
@@ -130,33 +153,38 @@ exports.completeMultipartUpload = async ({ filename, uploadId, partsEtag, }, con
                 ETag: etag,
             })),
         },
-    }).promise();
+    })
+        .promise();
 };
 exports.saveBackupMetadataOnS3 = async (metadata, config) => {
     const s3 = createS3api(config);
-    await s3.putObject({
+    await s3
+        .putObject({
         Bucket: config.s3bucket,
         Body: JSON.stringify(metadata, null, 4),
         Key: `${metadata.filename}_metadata`,
-    }).promise();
+    })
+        .promise();
 };
 exports.getBackupNamesFromS3 = async (config) => {
     const s3 = createS3api(config);
-    const objects = await s3.listObjectsV2({
+    const objects = await s3
+        .listObjectsV2({
         Bucket: config.s3bucket,
         Prefix: 'dbacked_',
-    }).promise();
-    return objects.Contents
-        .filter(({ Key }) => !lodash_1.endsWith(Key, '_metadata'))
-        .map(({ Key }) => Key);
+    })
+        .promise();
+    return objects.Contents.filter(({ Key }) => !lodash_1.endsWith(Key, '_metadata')).map(({ Key }) => Key);
 };
 exports.getBackupMetadataFromS3 = async (config, backupName) => {
     const s3 = createS3api(config);
     try {
-        const metadata = await s3.getObject({
+        const metadata = await s3
+            .getObject({
             Bucket: config.s3bucket,
             Key: `${backupName}_metadata`,
-        }).promise();
+        })
+            .promise();
         return JSON.parse(metadata.Body);
     }
     catch (e) {

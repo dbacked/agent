@@ -4,7 +4,7 @@ import * as daemon from 'daemonize-process';
 import * as lockfile from 'proper-lockfile';
 import { mkdir } from 'fs';
 import { promisify } from 'util';
-import * as downgradeRoot from 'downgrade-root';
+import downgradeRoot from 'downgrade-root';
 
 import { reportError, waitForNextBackupNeededFromAPI } from './dbackedApi';
 import { delay } from './delay';
@@ -15,15 +15,17 @@ import { initDatabase, waitForNextBackupNeededFromDatabase } from './dbStats';
 export const startDatabaseBackupJob = (config, backupInfo = {}) => {
   return new Promise((resolvePromise, reject) => {
     const runner = fork(resolve(__dirname, './backupRunner.js'));
-    runner.send(JSON.stringify({
-      type: 'startBackup',
-      payload: {
-        config,
-        backupInfo,
-      },
-    }));
+    runner.send(
+      JSON.stringify({
+        type: 'startBackup',
+        payload: {
+          config,
+          backupInfo,
+        },
+      }),
+    );
     let errorMessageReceived = false;
-    runner.on('message', (message) => {
+    runner.on('message', message => {
       try {
         const { type, payload } = JSON.parse(message);
         if (type === 'error') {
@@ -32,7 +34,7 @@ export const startDatabaseBackupJob = (config, backupInfo = {}) => {
         }
       } catch (e) {}
     });
-    runner.on('exit', (code) => {
+    runner.on('exit', code => {
       if (code === 0) {
         resolvePromise();
       } else if (!errorMessageReceived) {
@@ -44,21 +46,25 @@ export const startDatabaseBackupJob = (config, backupInfo = {}) => {
 
 const mkdirPromise = promisify(mkdir);
 
-export const agentLoop = async (commandLineArgs) => {
+export const agentLoop = async commandLineArgs => {
   const config = await getConfig(commandLineArgs);
 
   logger.info('Agent id:', { agentId: config.agentId });
 
   // Daemonize process if needed
   if (config.daemon) {
-    const daemonName = config.daemonName ? `dbacked_${config.daemonName}` : 'dbacked';
+    const daemonName = config.daemonName
+      ? `dbacked_${config.daemonName}`
+      : 'dbacked';
     const lockDir = `/tmp/${daemonName}`;
     try {
       await mkdirPromise(lockDir);
     } catch (e) {}
     // TODO check version of daemonized process and kill it if different
     if (await lockfile.check(lockDir)) {
-      logger.error('A daemon is already running, use the --daemon-name params if you need to launch it multiple time');
+      logger.error(
+        'A daemon is already running, use the --daemon-name params if you need to launch it multiple time',
+      );
       process.exit(1);
     }
     daemon();

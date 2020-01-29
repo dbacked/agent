@@ -1,13 +1,15 @@
-import * as uuidv4 from 'uuid/v4';
-import { fromPairs, map } from 'lodash';
-import { Client } from 'pg';
-import { createConnection } from 'mysql';
-import { MongoClient } from 'mongodb';
-import { promisify } from 'util';
-import { DateTime } from 'luxon';
 import * as cronParser from 'cron-parser';
+import uuidv4 from 'uuid/v4';
+
+import { fromPairs, map } from 'lodash';
+
+import { Client } from 'pg';
 import { Config } from './config';
+import { DateTime } from 'luxon';
+import { MongoClient } from 'mongodb';
+import { createConnection } from 'mysql';
 import { delay } from './delay';
+import { promisify } from 'util';
 
 interface DB_CONNECTION_INFO {
   dbHost?: string;
@@ -53,11 +55,14 @@ const databaseTypes = {
           v text
         );
       `);
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO dbacked (k, v)
         VALUES ('dbId', $1)
         ON CONFLICT (k) DO NOTHING
-      `, [uuidv4()]);
+      `,
+        [uuidv4()],
+      );
     },
     getDatabaseBackupStatus: async (connectionInfo: DB_CONNECTION_INFO) => {
       const client = databaseTypes.pg.createClient(connectionInfo);
@@ -68,11 +73,18 @@ const databaseTypes = {
     },
     saveBackupStatus: async (status, connectionInfo: DB_CONNECTION_INFO) => {
       const client = databaseTypes.pg.createClient(connectionInfo);
-      await Promise.all(map(status, (val, key) => client.query(`
+      await Promise.all(
+        map(status, (val, key) =>
+          client.query(
+            `
         INSERT INTO dbacked (k, v)
         VALUES ($1, $2)
         ON CONFLICT (k) DO UPDATE SET v = $2;
-      `, [key, val])));
+      `,
+            [key, val],
+          ),
+        ),
+      );
     },
   },
   mysql: {
@@ -103,10 +115,13 @@ const databaseTypes = {
           v VARCHAR(255)
         );
       `);
-      await clientQuery(`
+      await clientQuery(
+        `
         INSERT IGNORE INTO dbacked (k, v)
         VALUES ('dbId', ?);
-      `, [uuidv4()]);
+      `,
+        [uuidv4()],
+      );
     },
     getDatabaseBackupStatus: async (connectionInfo: DB_CONNECTION_INFO) => {
       const clientQuery = databaseTypes.mysql.createClientQuery(connectionInfo);
@@ -117,11 +132,18 @@ const databaseTypes = {
     },
     saveBackupStatus: async (status, connectionInfo: DB_CONNECTION_INFO) => {
       const clientQuery = databaseTypes.mysql.createClientQuery(connectionInfo);
-      await Promise.all(map(status, (val, key) => clientQuery(`
+      await Promise.all(
+        map(status, (val, key) =>
+          clientQuery(
+            `
         INSERT INTO dbacked (k, v)
         VALUES (?, ?)
         ON DUPLICATE KEY UPDATE v = ?;
-      `, [key, val, val])));
+      `,
+            [key, val, val],
+          ),
+        ),
+      );
     },
   },
   mongodb: {
@@ -135,62 +157,92 @@ const databaseTypes = {
     getDatabaseBackupableInfo: async (connectionInfo: DB_CONNECTION_INFO) => {
       const db = await databaseTypes.mongodb.createClient(connectionInfo);
       const collections = await db.listCollections().toArray();
-      return Promise.all(collections.map(async ({ name }) => {
-        const col = db.collection(name);
-        const lineCount = await col.estimatedDocumentCount();
-        return { name, lineCount };
-      }));
+      return Promise.all(
+        collections.map(async ({ name }) => {
+          const col = db.collection(name);
+          const lineCount = await col.estimatedDocumentCount();
+          return { name, lineCount };
+        }),
+      );
     },
     initDatabase: async (connectionInfo: DB_CONNECTION_INFO) => {
       const db = await databaseTypes.mongodb.createClient(connectionInfo);
       const collection = await db.createCollection('dbacked');
-      await collection.updateOne({
-        k: 'dbId',
-      }, {
-        $setOnInsert: {
-          v: uuidv4(),
+      await collection.updateOne(
+        {
+          k: 'dbId',
         },
-      }, { upsert: true });
+        {
+          $setOnInsert: {
+            v: uuidv4(),
+          },
+        },
+        { upsert: true },
+      );
     },
     getDatabaseBackupStatus: async (connectionInfo: DB_CONNECTION_INFO) => {
       const db = await databaseTypes.mongodb.createClient(connectionInfo);
-      const info = await db.collection('dbacked').find().toArray();
+      const info = await db
+        .collection('dbacked')
+        .find()
+        .toArray();
       return fromPairs(info.map(({ k, v }) => [k, v]));
     },
     saveBackupStatus: async (status, connectionInfo: DB_CONNECTION_INFO) => {
       const db = await databaseTypes.mongodb.createClient(connectionInfo);
-      await Promise.all(map(status, (val, key) => db.collection('dbacked').update({
-        k: key,
-      }, {
-        $set: {
-          v: val,
-        },
-      }, { upsert: true })));
+      await Promise.all(
+        map(status, (val, key) =>
+          db.collection('dbacked').update(
+            {
+              k: key,
+            },
+            {
+              $set: {
+                v: val,
+              },
+            },
+            { upsert: true },
+          ),
+        ),
+      );
     },
   },
 };
 
-export const getDatabaseBackupableInfo = async (dbType, connectionInfo: DB_CONNECTION_INFO) =>
-  databaseTypes[dbType].getDatabaseBackupableInfo(connectionInfo);
+export const getDatabaseBackupableInfo = async (
+  dbType,
+  connectionInfo: DB_CONNECTION_INFO,
+) => databaseTypes[dbType].getDatabaseBackupableInfo(connectionInfo);
 
-export const initDatabase = async (dbType, connectionInfo: DB_CONNECTION_INFO) =>
-  databaseTypes[dbType].initDatabase(connectionInfo);
+export const initDatabase = async (
+  dbType,
+  connectionInfo: DB_CONNECTION_INFO,
+) => databaseTypes[dbType].initDatabase(connectionInfo);
 
-export const getDatabaseBackupStatus = async (dbType, connectionInfo: DB_CONNECTION_INFO) =>
-  databaseTypes[dbType].getDatabaseBackupStatus(connectionInfo);
+export const getDatabaseBackupStatus = async (
+  dbType,
+  connectionInfo: DB_CONNECTION_INFO,
+) => databaseTypes[dbType].getDatabaseBackupStatus(connectionInfo);
 
 const isBackupNeeded = async (config: Config) => {
   const backupStatus = await getDatabaseBackupStatus(config.dbType, config);
 
-  const lastBackupDate = DateTime.fromMillis(backupStatus.lastBackupDate || 0).toUTC();
+  const lastBackupDate = DateTime.fromMillis(
+    backupStatus.lastBackupDate || 0,
+  ).toUTC();
   const cronExpression = cronParser.parseExpression(config.cron, { utc: true });
 
-  const idealPreviousCronDate = DateTime.fromJSDate(cronExpression.prev().toDate()).toUTC();
+  const idealPreviousCronDate = DateTime.fromJSDate(
+    cronExpression.prev().toDate(),
+  ).toUTC();
   return lastBackupDate.diff(idealPreviousCronDate).as('minutes') < 0;
 };
 
-export const saveBackupStatus = async (dbType, status, connectionInfo: DB_CONNECTION_INFO) =>
-  databaseTypes[dbType].saveBackupStatus(status, connectionInfo);
+export const saveBackupStatus = async (
+  dbType,
+  status,
+  connectionInfo: DB_CONNECTION_INFO,
+) => databaseTypes[dbType].saveBackupStatus(status, connectionInfo);
 
 export const waitForNextBackupNeededFromDatabase = async (config: Config) => {
   while (true) {

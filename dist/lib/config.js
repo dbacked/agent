@@ -1,17 +1,20 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const path_1 = require("path");
 const util_1 = require("util");
 const fs_1 = require("fs");
 const os_1 = require("os");
 const inquirer_1 = require("inquirer");
-const forge = require("node-forge");
-const randomstring = require("randomstring");
-const mkdirp = require("mkdirp");
-const cronParser = require("cron-parser");
+const node_forge_1 = __importDefault(require("node-forge"));
+const randomstring_1 = __importDefault(require("randomstring"));
+const mkdirp_1 = __importDefault(require("mkdirp"));
+const cron_parser_1 = __importDefault(require("cron-parser"));
 const lodash_1 = require("lodash");
 const dbackedApi_1 = require("./dbackedApi");
-const log_1 = require("./log");
+const log_1 = __importDefault(require("./log"));
 const dbStats_1 = require("./dbStats");
 const s3_1 = require("./s3");
 const helpers_1 = require("./helpers");
@@ -31,31 +34,38 @@ const configFields = [
     {
         name: 'subscriptionType',
         desc: 'What version of DBacked do you want to use?',
-        options: [{ name: 'DBacked Free', value: 'free' }, { name: 'DBacked Pro', value: 'pro' }],
+        options: [
+            { name: 'DBacked Free', value: 'free' },
+            { name: 'DBacked Pro', value: 'pro' },
+        ],
         required: true,
         default: 'free',
-    }, {
+    },
+    {
         name: 'agentId',
         desc: 'Server name',
-        default: `${os_1.hostname()}-${randomstring.generate(4)}`,
+        default: `${os_1.hostname()}-${randomstring_1.default.generate(4)}`,
         meta: {
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 'configFilePath',
         desc: 'Configuration file path',
         default: '/etc/dbacked/config.json',
         meta: {
             doNotAsk: true,
         },
-    }, {
+    },
+    {
         name: 'databaseToolsDirectory',
         desc: 'Database dumper and restorer download location',
         default: '/tmp/dbacked',
         meta: {
             doNotAsk: true,
         },
-    }, {
+    },
+    {
         name: 'apikey',
         desc: 'DBacked API key',
         if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.pro,
@@ -64,7 +74,8 @@ const configFields = [
             await dbackedApi_1.getProject();
             return true;
         },
-    }, {
+    },
+    {
         name: 'email',
         desc: 'Email to send an alert to if no backups in 30 days [Optionnal]',
         if: ({ subscriptionType }) => subscriptionType === 'free',
@@ -77,36 +88,44 @@ const configFields = [
         meta: {
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 'generateKeyPair',
         desc: 'Backup encryption key',
-        options: [{
-                value: true, name: 'Generate a new key pair',
-            }, {
-                value: false, name: 'Use an existing public key',
-            }],
+        options: [
+            {
+                value: true,
+                name: 'Generate a new key pair',
+            },
+            {
+                value: false,
+                name: 'Use an existing public key',
+            },
+        ],
         if: ({ subscriptionType, publicKey }) => !publicKey && subscriptionType === SUBSCRIPTION_TYPE.free,
         meta: {
             virtual: true,
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 'newKeyPairPassword',
         desc: 'Private key password',
         type: 'password',
-        if: (config) => config.generateKeyPair,
+        if: config => config.generateKeyPair,
         required: true,
         meta: {
             virtual: true,
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 'newKeyPairPasswordConfirm',
         desc: 'Private key password confirm',
         type: 'password',
-        if: (config) => config.generateKeyPair,
+        if: config => config.generateKeyPair,
         required: true,
-        validate: (config) => {
+        validate: config => {
             if (config.newKeyPairPassword !== config.newKeyPairPasswordConfirm) {
                 return 'Password and confirm do not match';
             }
@@ -114,10 +133,12 @@ const configFields = [
         },
         transform: async ({ newKeyPairPassword }) => {
             console.log('Generating key pair, this can take some time...');
-            const keypair = await util_1.promisify(forge.pki.rsa.generateKeyPair)({ bits: 4096, workers: -1 });
-            const publicKeyPem = forge.pki.publicKeyToPem(keypair.publicKey);
-            const privateKeyPem = forge.pki
-                .encryptRsaPrivateKey(keypair.privateKey, newKeyPairPassword);
+            const keypair = await util_1.promisify(node_forge_1.default.pki.rsa.generateKeyPair)({
+                bits: 4096,
+                workers: -1,
+            });
+            const publicKeyPem = node_forge_1.default.pki.publicKeyToPem(keypair.publicKey);
+            const privateKeyPem = node_forge_1.default.pki.encryptRsaPrivateKey(keypair.privateKey, newKeyPairPassword);
             const privateKeyPath = path_1.resolve(process.cwd(), 'dbacked_private_key.pem');
             await writeFileAsync(privateKeyPath, privateKeyPem);
             console.log(`Saved private key to: ${privateKeyPath}`);
@@ -129,15 +150,16 @@ const configFields = [
             virtual: true,
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 'publicKey',
         type: 'editor',
         required: true,
         desc: 'RSA Public Key to encrypt the backups',
-        if: (config) => !config.generateKeyPair,
+        if: config => !config.generateKeyPair,
         validate: ({ publicKey }) => {
             try {
-                forge.pki.publicKeyFromPem(publicKey);
+                node_forge_1.default.pki.publicKeyFromPem(publicKey);
                 return true;
             }
             catch (e) {
@@ -147,14 +169,16 @@ const configFields = [
         meta: {
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 's3accessKeyId',
         desc: 'S3 Access Key ID',
         if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
         required: true,
         envName: 'S3_ACCESS_KEY_ID',
         argName: 's3-access-key-id',
-    }, {
+    },
+    {
         name: 's3secretAccessKey',
         desc: 'S3 Secret Access Key',
         envName: 'S3_SECRET_ACCESS_KEY',
@@ -162,28 +186,52 @@ const configFields = [
         type: 'password',
         if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
         required: true,
-    }, {
+    },
+    {
+        name: 'setCustomStorageEndpoint',
+        desc: 'Do you want to set a custom storage endpoint?',
+        options: [
+            { value: true, name: 'yes' },
+            { value: false, name: 'no' },
+        ],
+        default: 'no',
+        required: true,
+    },
+    {
+        name: 'storageEndpoint',
+        if: ({ setCustomStorageEndpoint, subscriptionType }) => setCustomStorageEndpoint && subscriptionType === SUBSCRIPTION_TYPE.free,
+        envName: 'STORAGE_ENDPOINT',
+        argName: 'storage-endpoint',
+        desc: 'Custom storage endpoint',
+        required: true,
+    },
+    {
         name: 's3region',
         envName: 'S3_REGION',
         argName: 's3-region',
         desc: 'S3 Region',
         if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
         // TODO: validate region
-        required: true,
-    }, {
+        required: false,
+    },
+    {
         name: 's3bucket',
         envName: 'S3_BUCKET',
         argName: 's3-bucket',
         desc: 'S3 Bucket',
         if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
         required: true,
-        validate: async ({ s3accessKeyId, s3secretAccessKey, s3bucket, s3region, }, interactive = false) => {
+        validate: async ({ s3accessKeyId, s3secretAccessKey, s3bucket, s3region, storageEndpoint }, interactive = false) => {
             if (interactive) {
                 console.log('Testing credentials on S3...');
             }
             try {
                 await s3_1.getBucketInfo({
-                    s3accessKeyId, s3secretAccessKey, s3bucket, s3region,
+                    s3accessKeyId,
+                    s3secretAccessKey,
+                    s3bucket,
+                    s3region,
+                    storageEndpoint,
                 });
                 return true;
             }
@@ -191,7 +239,8 @@ const configFields = [
                 return `Error from S3: ${e.toString()}`;
             }
         },
-    }, {
+    },
+    {
         name: 'dbType',
         desc: 'Database type',
         options: [
@@ -206,19 +255,29 @@ const configFields = [
         desc: 'Database connection string (starts with mongodb://)',
         if: ({ dbType }) => dbType === 'mongodb',
     },
-    { name: 'dbHost', desc: 'Database Host', if: ({ dbType }) => dbType !== 'mongodb' },
-    { name: 'dbPort', desc: 'Database Port', if: ({ dbType }) => dbType !== 'mongodb' },
+    {
+        name: 'dbHost',
+        desc: 'Database Host',
+        if: ({ dbType }) => dbType !== 'mongodb',
+    },
+    {
+        name: 'dbPort',
+        desc: 'Database Port',
+        if: ({ dbType }) => dbType !== 'mongodb',
+    },
     {
         name: 'dbUsername',
         desc: 'Database username',
         required: true,
         if: ({ dbType }) => dbType !== 'mongodb',
-    }, {
+    },
+    {
         name: 'dbPassword',
         desc: 'Database password',
         type: 'password',
         if: ({ dbType }) => dbType !== 'mongodb',
-    }, {
+    },
+    {
         name: 'dbName',
         desc: 'Database name',
         required: true,
@@ -239,26 +298,29 @@ const configFields = [
                 return `Error while connecting to database: ${e.toString()}`;
             }
         },
-    }, {
+    },
+    {
         name: 'dbAlias',
         desc: 'Database alias (used for backup filename)',
         if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
         meta: {
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 'dumperOptions',
         desc: 'Command line option to set on pg_dump, mongodump or mysqldump',
         meta: {
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 'cron',
         desc: 'When do you want to start the backups? (UTC Cron Expression)',
         if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
         validate: ({ cron }) => {
             try {
-                cronParser.parseExpression(cron);
+                cron_parser_1.default.parseExpression(cron);
                 return true;
             }
             catch (e) {
@@ -268,22 +330,28 @@ const configFields = [
         meta: {
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 'sendAnalytics',
         // TODO: link to a page explaining which analytics are being sent
         desc: 'Authorize DBacked to send anonymized analytics?',
         if: ({ subscriptionType }) => subscriptionType === SUBSCRIPTION_TYPE.free,
-        options: [{ name: 'Yes', value: true }, { name: 'No', value: false }],
+        options: [
+            { name: 'Yes', value: true },
+            { name: 'No', value: false },
+        ],
         meta: {
             notForRestore: true,
         },
-    }, {
+    },
+    {
         name: 'daemon',
         desc: 'Daemonize / Run backup process in background',
         meta: {
             doNotAsk: true,
         },
-    }, {
+    },
+    {
         name: 'daemonName',
         desc: 'Daemon name, used to run multiple daemon of DBacked at the same time',
         meta: {
@@ -293,15 +361,17 @@ const configFields = [
 ];
 const readFilePromisified = util_1.promisify(fs_1.readFile);
 exports.getConfigFileContent = async (configFilePath) => {
-    const fileContent = await readFilePromisified(configFilePath, { encoding: 'utf-8' });
+    const fileContent = await readFilePromisified(configFilePath, {
+        encoding: 'utf-8',
+    });
     return JSON.parse(fileContent);
 };
 // Create a new object from merge of both config object
 const mergeConfigs = (...configs) => {
     // Merge without undefined values
     const res = {};
-    configs.forEach((config) => {
-        configFields.forEach((field) => {
+    configs.forEach(config => {
+        configFields.forEach(field => {
             if (field.meta && field.meta.virtual) {
                 return;
             }
@@ -316,8 +386,8 @@ const mergeConfigs = (...configs) => {
 const mergeConfigsWithVirtuals = (...configs) => {
     // Merge without undefined values
     const res = {};
-    configs.forEach((config) => {
-        configFields.forEach((field) => {
+    configs.forEach(config => {
+        configFields.forEach(field => {
             if (config[field.name]) {
                 res[field.name] = config[field.name];
             }
@@ -325,7 +395,7 @@ const mergeConfigsWithVirtuals = (...configs) => {
     });
     return res;
 };
-const mkdirpPromisified = util_1.promisify(mkdirp);
+const mkdirpPromisified = util_1.promisify(mkdirp_1.default);
 const writeFilePromisified = util_1.promisify(fs_1.writeFile);
 const saveConfig = async (config) => {
     try {
@@ -336,7 +406,10 @@ const saveConfig = async (config) => {
         await writeFilePromisified(config.configFilePath, JSON.stringify(config, null, 4));
     }
     catch (e) {
-        log_1.default.error('Couldn\'t save JSON config file', { filePath: config.configFilePath, error: e.message });
+        log_1.default.error("Couldn't save JSON config file", {
+            filePath: config.configFilePath,
+            error: e.message,
+        });
     }
 };
 const askForConfig = async (inferredConfig, { filter }) => {
@@ -348,7 +421,8 @@ const askForConfig = async (inferredConfig, { filter }) => {
         if (filter && !filter(configField)) {
             continue;
         }
-        if (configField.if && !configField.if(mergeConfigsWithVirtuals(inferredConfig, answers))) {
+        if (configField.if &&
+            !configField.if(mergeConfigsWithVirtuals(inferredConfig, answers))) {
             continue;
         }
         const answer = await inquirer_1.prompt({
@@ -362,7 +436,9 @@ const askForConfig = async (inferredConfig, { filter }) => {
                     return 'Required';
                 }
                 if (configField.validate) {
-                    return configField.validate(mergeConfigsWithVirtuals(inferredConfig, answers, { [configField.name]: res }), true);
+                    return configField.validate(mergeConfigsWithVirtuals(inferredConfig, answers, {
+                        [configField.name]: res,
+                    }), true);
                 }
                 return true;
             },
@@ -398,7 +474,8 @@ const checkConfig = async (config, { filter }) => {
             }
         }
         if (error) {
-            const envName = configField.envName || `DBACKED_${lodash_1.snakeCase(configField.name).toUpperCase()}`;
+            const envName = configField.envName ||
+                `DBACKED_${lodash_1.snakeCase(configField.name).toUpperCase()}`;
             const argName = configField.argName || `--${lodash_1.kebabCase(configField.name)}`;
             errors.push(`Error with '${configField.name}': ${error} (configurable with ${envName} env variable, ${argName} command line arg of ${configField.name} config variable)`);
         }

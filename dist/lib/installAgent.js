@@ -1,11 +1,14 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const util_1 = require("util");
 const fs_1 = require("fs");
-const isRoot = require("is-root");
 const child_process_1 = require("child_process");
-const log_1 = require("./log");
 const config_1 = require("./config");
+const is_root_1 = __importDefault(require("is-root"));
+const log_1 = __importDefault(require("./log"));
+const util_1 = require("util");
 const writeFilePromisified = util_1.promisify(fs_1.writeFile);
 const copyFilePromisified = util_1.promisify(fs_1.copyFile);
 const execPromisified = util_1.promisify(child_process_1.exec);
@@ -33,22 +36,29 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 `;
-    log_1.default.info('Saving systemd service file', { path: '/lib/systemd/system/dbacked.service' });
+    log_1.default.info('Saving systemd service file', {
+        path: '/lib/systemd/system/dbacked.service',
+    });
     await writeFilePromisified('/lib/systemd/system/dbacked.service', service);
     log_1.default.info('Activating service');
     await execPromisified('systemctl daemon-reload');
     await execPromisified('systemctl enable --now dbacked.service');
-    log_1.default.info('Service installed and stated');
+    log_1.default.info('Service installed and started');
 };
 exports.installAgent = async (commandLine) => {
-    if (!isRoot()) {
+    if (!is_root_1.default()) {
         console.error('Should be executed as root to install (as we are creating a systemd service)');
         process.exit(1);
     }
-    await config_1.getConfig(commandLine, { interactive: !commandLine.y, saveOnDisk: true });
+    await config_1.getConfig(commandLine, {
+        interactive: !commandLine.y,
+        saveOnDisk: true,
+    });
     let isSystemd = false;
     try {
-        isSystemd = (await execPromisified('ps --no-headers -o comm 1')).stdout === 'systemd\n';
+        isSystemd =
+            (await execPromisified('ps --no-headers -o comm 1')).stdout ===
+                'systemd\n';
     }
     catch (e) { }
     if (isSystemd) {

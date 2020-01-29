@@ -34,7 +34,7 @@ exports.restoreDb = async (stream, config) => {
     }[config.dbType]();
     const restoreProcess = await child_process_1.spawn(path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`, 'restore'), args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: Object.assign({}, process.env, { PGPASSWORD: config.dbPassword, LD_LIBRARY_PATH: path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`) }),
+        env: Object.assign(Object.assign({}, process.env), { PGPASSWORD: config.dbPassword, LD_LIBRARY_PATH: path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`) }),
     });
     // TODO: add a percentage indicator
     stream.pipe(restoreProcess.stdin);

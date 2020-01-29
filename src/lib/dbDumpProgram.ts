@@ -1,12 +1,13 @@
-import { resolve } from 'path';
-import Axios from 'axios';
 import * as unzip from 'unzip-stream';
-import * as mkdirp from 'mkdirp';
-import { promisify } from 'util';
 
+import { chmodExec, computeFolderContentMd5, waitForStreamEnd } from './fs';
+
+import Axios from 'axios';
 import { DB_TYPE } from './config';
-import { waitForStreamEnd, chmodExec, computeFolderContentMd5 } from './fs';
 import logger from './log';
+import mkdirp from 'mkdirp';
+import { promisify } from 'util';
+import { resolve } from 'path';
 
 const mkdirpPromisifed = promisify(mkdirp);
 
@@ -28,7 +29,9 @@ const needToDownloadDumpProgram = async (type, dumpProgramDirectory) => {
 
 export const checkDbDumpProgram = async (type: DB_TYPE, directory) => {
   const dumpProgramDirectory = resolve(directory, `${type}_dumper`);
-  logger.debug('Testing if db dump program exists at', { path: dumpProgramDirectory });
+  logger.debug('Testing if db dump program exists at', {
+    path: dumpProgramDirectory,
+  });
   if (await needToDownloadDumpProgram(type, dumpProgramDirectory)) {
     logger.debug('Downloading dump programs', { path: dumpProgramDirectory });
     const fileUrl = {

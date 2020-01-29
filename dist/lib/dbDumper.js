@@ -1,11 +1,14 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const child_process_1 = require("child_process");
 const path_1 = require("path");
 const lodash_1 = require("lodash");
 const util_1 = require("util");
 const crypto_1 = require("crypto");
-const log_1 = require("./log");
+const log_1 = __importDefault(require("./log"));
 const childProcessHelpers_1 = require("./childProcessHelpers");
 const zlib_1 = require("zlib");
 const randomBytesPromise = util_1.promisify(crypto_1.randomBytes);
@@ -62,7 +65,7 @@ exports.startDumper = async (backupKey, config) => {
     const cipher = crypto_1.createCipheriv('aes256', backupKey, iv);
     const dumpProcess = await child_process_1.spawn(path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`, 'dump'), args, {
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: Object.assign({}, process.env, { PGPASSWORD: config.dbPassword, LD_LIBRARY_PATH: path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`) }),
+        env: Object.assign(Object.assign({}, process.env), { PGPASSWORD: config.dbPassword, LD_LIBRARY_PATH: path_1.resolve(config.databaseToolsDirectory, `${config.dbType}_dumper`) }),
     });
     const processWatcher = await childProcessHelpers_1.createProcessWatcher(dumpProcess);
     log_1.default.debug('Started dump process');
